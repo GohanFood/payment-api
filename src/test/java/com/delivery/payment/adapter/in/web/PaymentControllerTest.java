@@ -3,6 +3,7 @@ package com.delivery.payment.adapter.in.web;
 import com.delivery.payment.application.dto.request.CreatePaymentRequest;
 import com.delivery.payment.application.dto.request.ProcessPaymentRequest;
 import com.delivery.payment.application.dto.request.RefundPaymentRequest;
+import com.delivery.payment.application.service.PaymentStatusSyncService;
 import com.delivery.payment.application.usecase.*;
 import com.delivery.payment.config.JwtConfig;
 import com.delivery.payment.config.SecurityConfig;
@@ -59,6 +60,9 @@ class PaymentControllerTest {
 
     @MockBean
     private RefundPaymentUseCase refundPaymentUseCase;
+
+    @MockBean
+    private PaymentStatusSyncService paymentStatusSyncService;
 
     @MockBean
     private JwtConfig jwtConfig;
@@ -128,6 +132,7 @@ class PaymentControllerTest {
         UUID paymentId = UUID.randomUUID();
         ProcessPaymentRequest request = new ProcessPaymentRequest();
         request.setGatewayToken("token-xyz");
+        request.setPayerEmail("test@email.com");
 
         Payment payment = Payment.builder()
                 .id(paymentId)
@@ -141,7 +146,7 @@ class PaymentControllerTest {
                 .updatedAt(LocalDateTime.now())
                 .build();
 
-        when(processPaymentUseCase.execute(eq(paymentId), eq("token-xyz"))).thenReturn(payment);
+        when(processPaymentUseCase.execute(eq(paymentId), any(ProcessPaymentRequest.class))).thenReturn(payment);
 
         mockMvc.perform(post("/api/v1/payments/" + paymentId + "/process")
                         .header("Authorization", "Bearer " + jwtToken)

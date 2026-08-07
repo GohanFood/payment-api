@@ -115,6 +115,13 @@
             <version>4.0.0</version>
         </dependency>
 
+        <!-- Mercado Pago SDK -->
+        <dependency>
+            <groupId>com.mercadopago</groupId>
+            <artifactId>sdk-java</artifactId>
+            <version>2.8.0</version>
+        </dependency>
+
         <!-- Jackson JSR310 -->
         <dependency>
             <groupId>com.fasterxml.jackson.datatype</groupId>

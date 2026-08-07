@@ -13,6 +13,8 @@ services:
       - SPRING_DATASOURCE_USERNAME=paymentapi
       - SPRING_DATASOURCE_PASSWORD=paymentapi123
       - JWT_SECRET=${JWT_SECRET:-dev-secret-key}
+      - MERCADOPAGO_ACCESS_TOKEN=${MERCADOPAGO_ACCESS_TOKEN:-}
+      - MERCADOPAGO_PUBLIC_KEY=${MERCADOPAGO_PUBLIC_KEY:-}
     depends_on:
       postgres-payment:
         condition: service_healthy

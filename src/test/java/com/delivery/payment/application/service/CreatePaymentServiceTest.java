@@ -3,6 +3,7 @@ package com.delivery.payment.application.service;
 import com.delivery.payment.domain.payment.Payment;
 import com.delivery.payment.domain.payment.PaymentStatus;
 import com.delivery.payment.domain.payment.exception.InvalidPaymentAmountException;
+import com.delivery.payment.port.PaymentGatewayPort;
 import com.delivery.payment.port.PaymentMessagingPort;
 import com.delivery.payment.port.PaymentRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,11 +29,14 @@ class CreatePaymentServiceTest {
     @Mock
     private PaymentMessagingPort paymentMessagingPort;
 
+    @Mock
+    private PaymentGatewayPort paymentGatewayPort;
+
     private CreatePaymentService service;
 
     @BeforeEach
     void setUp() {
-        service = new CreatePaymentService(paymentRepository, paymentMessagingPort);
+        service = new CreatePaymentService(paymentRepository, paymentMessagingPort, paymentGatewayPort);
     }
 
     @Test

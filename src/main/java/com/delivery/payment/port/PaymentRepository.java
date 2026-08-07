@@ -16,5 +16,11 @@ public interface PaymentRepository {
 
     List<Payment> findByOrderId(UUID orderId);
 
+    Optional<Payment> findByMpPaymentId(Long mpPaymentId);
+
+    Optional<Payment> findByGatewayTransactionId(String gatewayTransactionId);
+
+    List<Payment> findAll();
+
     void delete(Payment payment);
 }

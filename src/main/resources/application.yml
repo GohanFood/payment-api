@@ -34,6 +34,16 @@ spring:
 jwt:
   secret: ${JWT_SECRET}
 
+# ---------------------------------------------------------------------------
+# Mercado Pago — Gateway de Pagamento via Cartão
+# ---------------------------------------------------------------------------
+# Access Token (obrigatório): gere em https://www.mercadopago.com.br/settings/account/credentials
+#   TEST (sandbox) para testes | PROD para transações reais
+# Public Key: usada no frontend para inicializar MercadoPago.js CardForm
+mercadopago:
+  access-token: ${MERCADOPAGO_ACCESS_TOKEN:}
+  public-key: ${MERCADOPAGO_PUBLIC_KEY:}
+
 server:
   port: 8082
 

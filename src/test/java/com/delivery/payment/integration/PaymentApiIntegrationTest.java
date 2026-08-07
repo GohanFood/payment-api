@@ -122,7 +122,10 @@ class PaymentApiIntegrationTest {
         String paymentId = objectMapper.readTree(createResponse).get("id").asText();
 
         // Process payment
-        Map<String, Object> processRequest = Map.of("gatewayToken", "tok-test-123");
+        Map<String, Object> processRequest = Map.of(
+                "gatewayToken", "tok-test-123",
+                "payerEmail", "test@email.com"
+        );
 
         mockMvc.perform(post("/api/v1/payments/" + paymentId + "/process")
                         .header("Authorization", "Bearer " + jwtToken)

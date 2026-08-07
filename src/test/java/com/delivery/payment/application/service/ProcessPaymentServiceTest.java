@@ -1,9 +1,12 @@
 package com.delivery.payment.application.service;
 
+import com.delivery.payment.application.dto.request.ProcessPaymentRequest;
 import com.delivery.payment.domain.payment.Payment;
 import com.delivery.payment.domain.payment.PaymentStatus;
 import com.delivery.payment.domain.payment.exception.PaymentAlreadyProcessedException;
 import com.delivery.payment.domain.payment.exception.PaymentNotFoundException;
+import com.delivery.payment.domain.payment.gateway.PaymentGatewayPort;
+import com.delivery.payment.domain.payment.gateway.PaymentGatewayResponse;
 import com.delivery.payment.port.PaymentMessagingPort;
 import com.delivery.payment.port.PaymentRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,11 +33,22 @@ class ProcessPaymentServiceTest {
     @Mock
     private PaymentMessagingPort paymentMessagingPort;
 
+    @Mock
+    private PaymentGatewayPort paymentGateway;
+
     private ProcessPaymentService service;
+
+    private ProcessPaymentRequest validRequest;
 
     @BeforeEach
     void setUp() {
-        service = new ProcessPaymentService(paymentRepository, paymentMessagingPort);
+        service = new ProcessPaymentService(paymentRepository, paymentMessagingPort, paymentGateway);
+        validRequest = ProcessPaymentRequest.builder()
+                .gatewayToken("token-xyz")
+                .payerEmail("test@email.com")
+                .installments(1)
+                .paymentMethodId("visa")
+                .build();
     }
 
     @Test
@@ -52,22 +66,17 @@ class ProcessPaymentServiceTest {
                 .updatedAt(LocalDateTime.now())
                 .build();
 
-        Payment completed = Payment.builder()
-                .id(paymentId)
-                .userId(pending.getUserId())
-                .orderId(orderId)
-                .amount(pending.getAmount())
-                .paymentMethod(pending.getPaymentMethod())
-                .status(PaymentStatus.COMPLETED)
-                .gatewayTransactionId("GW-ABC123")
-                .createdAt(pending.getCreatedAt())
-                .updatedAt(LocalDateTime.now())
+        PaymentGatewayResponse gatewayResponse = PaymentGatewayResponse.builder()
+                .externalId("123456")
+                .externalStatus("approved")
+                .externalStatusDetail("accredited")
                 .build();
 
         when(paymentRepository.findById(paymentId)).thenReturn(Optional.of(pending));
-        when(paymentRepository.save(any())).thenReturn(completed);
+        when(paymentGateway.processCardPayment(any())).thenReturn(gatewayResponse);
+        when(paymentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        Payment result = service.execute(paymentId, "token-xyz");
+        Payment result = service.execute(paymentId, validRequest);
 
         assertNotNull(result);
         assertEquals(PaymentStatus.COMPLETED, result.getStatus());
@@ -81,7 +90,7 @@ class ProcessPaymentServiceTest {
         when(paymentRepository.findById(paymentId)).thenReturn(Optional.empty());
 
         assertThrows(PaymentNotFoundException.class, () ->
-                service.execute(paymentId, "token"));
+                service.execute(paymentId, validRequest));
         verify(paymentRepository, never()).save(any());
     }
 
@@ -102,7 +111,7 @@ class ProcessPaymentServiceTest {
         when(paymentRepository.findById(paymentId)).thenReturn(Optional.of(completed));
 
         assertThrows(PaymentAlreadyProcessedException.class, () ->
-                service.execute(paymentId, "token"));
+                service.execute(paymentId, validRequest));
         verify(paymentRepository, never()).save(any());
     }
 
@@ -123,7 +132,7 @@ class ProcessPaymentServiceTest {
         when(paymentRepository.findById(paymentId)).thenReturn(Optional.of(failed));
 
         assertThrows(PaymentAlreadyProcessedException.class, () ->
-                service.execute(paymentId, "token"));
+                service.execute(paymentId, validRequest));
     }
 
     @Test
@@ -143,6 +152,6 @@ class ProcessPaymentServiceTest {
         when(paymentRepository.findById(paymentId)).thenReturn(Optional.of(refunded));
 
         assertThrows(PaymentAlreadyProcessedException.class, () ->
-                service.execute(paymentId, "token"));
+                service.execute(paymentId, validRequest));
     }
 }

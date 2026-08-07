@@ -2,7 +2,7 @@
 
 ## 1. Visão Geral
 
-O **PaymentAPI** é o microsserviço responsável pelo gerenciamento de pagamentos do sistema **deliveryAPI**. Ele gerencia o ciclo de vida completo de um pagamento: criação, processamento via gateway, consulta e reembolso.
+O **PaymentAPI** é o microsserviço responsável pelo gerenciamento de pagamentos do sistema **deliveryAPI**. Ele gerencia o ciclo de vida completo de um pagamento: criação, processamento via Mercado Pago (PIX ou Cartão), consulta, reembolso e sincronização de status via webhook.
 
 ### Stack Tecnológica
 
@@ -14,7 +14,8 @@ O **PaymentAPI** é o microsserviço responsável pelo gerenciamento de pagament
 | Banco de Dados | PostgreSQL 16 |
 | Migrations | Flyway |
 | Mensageria | Apache Kafka (Spring Kafka 3.3) |
-| Autenticação | JWT (jjwt 0.12.6) |
+| Autenticação | JWT HS256 (jjwt 0.12.6) |
+| Gateway Pagamento | Mercado Pago SDK Java 2.8.0 |
 | Rate Limiting | Bucket4j 8.10 |
 | Documentação | OpenAPI / Swagger (springdoc 2.8) |
 | Testes | JUnit 5 + Mockito + Testcontainers |
@@ -28,31 +29,108 @@ O PaymentAPI segue o padrão **Clean Architecture** (Hexagonal), com as seguinte
 
 ```
 adapter/in/web          ← Controllers REST, filtros JWT
-application/            ← Casos de uso, DTOs, serviços
+application/            ← Casos de uso, DTOs, serviços (inclui PaymentStatusSyncService)
 domain/                 ← Entidades, value objects, exceções
-port/                   ← Interfaces (repositório, mensageria)
+  ├── payment/          ← Payment, PaymentStatus, exceções
+  └── payment/gateway/  ← PaymentGatewayPort, PaymentGatewayRequest/Response
+port/                   ← Interfaces (repositório, mensageria, gateway)
 adapter/out/persistence ← JPA, Flyway, PostgreSQL
 adapter/out/messaging   ← Kafka Producer / Consumer
-config/                 ← Security, Kafka, OpenAPI
-advice/                 ← Global Exception Handler
+adapter/out/gateway/    ← MercadoPagoGateway (PIX + Cartão + Reembolso + Consulta)
+config/                 ← Security, Kafka, OpenAPI, MercadoPagoProperties
+advice/                 ← Global Exception Handler (inclui GatewayUnavailableException 502)
 ```
 
-### Fluxo de Pagamento
+### Fluxo de Pagamento via Cartão (Mercado Pago)
 
 ```
-1. Frontend/OrderAPI → POST /payments (cria pagamento PENDING)
-2. PaymentAPI → Kafka: payment.created
-3. Frontend → POST /payments/{id}/process (gatewayToken)
-4. PaymentAPI → Gateway (simulado) → COMPLETED
-5. PaymentAPI → Kafka: payment.completed
+┌──────────────┐      ┌──────────────────┐      ┌──────────────┐
+│   Frontend   │      │   Payment API    │      │ Mercado Pago │
+│ (MP.js       │      │   (Backend)      │      │   (Gateway)  │
+│  CardForm)   │      │                  │      │              │
+└──────┬───────┘      └────────┬─────────┘      └──────┬───────┘
+       │                       │                       │
+       │ 1. Inicializa         │                       │
+       │    mp.cardForm()      │                       │
+       │                       │                       │
+       │ 2. Usuário preenche   │                       │
+       │    dados do cartão    │                       │
+       │                       │                       │
+       │ 3. CardForm gera      │                       │
+       │    CardToken          │                       │
+       │                       │                       │
+       │ 4. POST /payments/{id}/process             │
+       │    { gatewayToken,    │                       │
+       │      payerEmail,      │                       │
+       │      installments,    │                       │
+       │      paymentMethodId, │                       │
+       │      issuerId, ... }  │                       │
+       │──────────────────────>│                       │
+       │                       │ 5. POST /v1/payments  │
+       │                       │──────────────────────>│
+       │                       │                       │
+       │                       │ 6. { id, status }     │
+       │                       │<──────────────────────│
+       │                       │                       │
+       │                       │ 7. approved → COMPLETED│
+       │                       │    rejected → FAILED   │
+       │                       │    pending  → PENDING  │
+       │                       │                       │
+       │                       │ 8. Kafka: payment.completed│
+       │                       │──────────────────────>│
+       │                       │                       │
+       │ 9. Response           │                       │
+       │<──────────────────────│                       │
+       │                       │                       │
+       │                       │ 10. Webhook IPN       │
+       │                       │<──────────────────────│
+       │                       │     (async, status)   │
+```
+
+### Fluxo de Pagamento via PIX (Mercado Pago)
+
+```
+┌──────────────┐      ┌──────────────────┐      ┌──────────────┐
+│   Frontend   │      │   Payment API    │      │ Mercado Pago │
+└──────┬───────┘      └────────┬─────────┘      └──────┬───────┘
+       │ 1. POST /payments     │                       │
+       │    { paymentMethod:   │                       │
+       │      "PIX",           │                       │
+       │      payerEmail, ...} │                       │
+       │──────────────────────>│                       │
+       │                       │ 2. POST /v1/payments  │
+       │                       │    (paymentMethodId:  │
+       │                       │     "pix")            │
+       │                       │──────────────────────>│
+       │                       │                       │
+       │                       │ 3. { id, status,      │
+       │                       │      point_of_interaction:
+       │                       │        qr_code,       │
+       │                       │        qr_code_base64,│
+       │                       │        ticket_url }   │
+       │                       │<──────────────────────│
+       │                       │                       │
+       │ 4. Response c/ QR Code│                       │
+       │<──────────────────────│                       │
+       │                       │                       │
+       │ 5. Exibe QR Code      │                       │
+       │    para pagamento     │                       │
+       │                       │                       │
+       │                       │ 6. Webhook IPN        │
+       │                       │<──────────────────────│
+       │                       │     (approved/rejected)│
+       │                       │                       │
+       │                       │ 7. Kafka: payment.completed│
+       │                       │    ou payment.failed  │
 ```
 
 ### Fluxo de Reembolso
 
 ```
-1. Frontend → POST /payments/refund
-2. PaymentAPI → REFUNDED
-3. PaymentAPI → Kafka: payment.failed
+1. Frontend → POST /api/v1/payments/refund
+2. PaymentAPI → Mercado Pago: refund(paymentId)
+3. PaymentAPI → status = REFUNDED
+4. PaymentAPI → Kafka: payment.failed
 ```
 
 ---
@@ -67,9 +145,17 @@ advice/                 ← Global Exception Handler
 | `userId` | UUID | ID do usuário dono do pagamento |
 | `orderId` | UUID | ID do pedido associado |
 | `amount` | BigDecimal | Valor do pagamento (> 0) |
-| `paymentMethod` | String | Método de pagamento (CREDIT_CARD, PIX, etc.) |
+| `paymentMethod` | String | Método: CREDIT_CARD, DEBIT_CARD, PIX, BOLETO |
 | `status` | PaymentStatus | Estado atual do pagamento |
-| `gatewayTransactionId` | String | ID da transação no gateway (nullable) |
+| `gatewayTransactionId` | String | ID da transação no Mercado Pago |
+| `mpPaymentId` | Long | ID numérico no Mercado Pago (PIX) |
+| `qrCode` | String | QR Code PIX copia-e-cola |
+| `qrCodeBase64` | String | QR Code PIX em base64 |
+| `ticketUrl` | String | URL do comprovante PIX |
+| `payerEmail` | String | Email do comprador |
+| `payerDocumentType` | String | Tipo de documento (CPF, CNPJ) |
+| `payerDocumentNumber` | String | Número do documento |
+| `expiresAt` | LocalDateTime | Data de expiração (PIX) |
 | `createdAt` | LocalDateTime | Data de criação |
 | `updatedAt` | LocalDateTime | Data da última atualização |
 
@@ -78,6 +164,14 @@ advice/                 ← Global Exception Handler
 - `PENDING` → `PROCESSING` → `COMPLETED` / `FAILED`
 - `COMPLETED` → `REFUNDED`
 - `PENDING` → `CANCELLED`
+
+### Gateway Value Objects (domain/payment/gateway/)
+
+| Classe | Descrição |
+|--------|-----------|
+| `PaymentGatewayPort` | Interface: `processCardPayment`, `refundPayment`, `getPayment` |
+| `PaymentGatewayRequest` | Dados do cartão: cardToken, amount, installments, paymentMethodId, issuerId, payer |
+| `PaymentGatewayResponse` | Resposta: externalId, externalStatus, externalStatusDetail, paymentTypeId |
 
 ---
 
@@ -95,6 +189,14 @@ CREATE TABLE IF NOT EXISTS payments (
     payment_method VARCHAR(50) NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
     gateway_transaction_id VARCHAR(100),
+    mp_payment_id BIGINT,
+    qr_code TEXT,
+    qr_code_base64 TEXT,
+    ticket_url TEXT,
+    payer_email VARCHAR(255),
+    payer_document_type VARCHAR(10),
+    payer_document_number VARCHAR(20),
+    expires_at TIMESTAMP,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
@@ -102,6 +204,7 @@ CREATE TABLE IF NOT EXISTS payments (
 CREATE INDEX idx_payments_user_id ON payments(user_id);
 CREATE INDEX idx_payments_order_id ON payments(order_id);
 CREATE INDEX idx_payments_status ON payments(status);
+CREATE INDEX idx_payments_gateway_tx ON payments(gateway_transaction_id);
 ```
 
 ---
@@ -110,11 +213,12 @@ CREATE INDEX idx_payments_status ON payments(status);
 
 | Método | Path | Descrição | Auth |
 |--------|------|-----------|------|
-| `POST` | `/api/v1/payments` | Criar pagamento pendente | ✅ |
-| `POST` | `/api/v1/payments/{id}/process` | Processar pagamento | ✅ |
+| `POST` | `/api/v1/payments` | Criar pagamento pendente (PIX gera QR Code) | ✅ |
+| `POST` | `/api/v1/payments/{id}/process` | Processar pagamento via cartão (Mercado Pago) | ✅ |
 | `GET` | `/api/v1/payments/{id}` | Buscar pagamento por ID | ✅ |
 | `GET` | `/api/v1/payments?userId=` | Listar pagamentos do usuário | ✅ |
 | `POST` | `/api/v1/payments/refund` | Reembolsar pagamento | ✅ |
+| `POST` | `/api/v1/payments/webhook` | Webhook IPN do Mercado Pago | — |
 
 ---
 
@@ -126,31 +230,69 @@ CREATE INDEX idx_payments_status ON payments(status);
 |--------|--------|
 | `payment.created` | Pagamento PENDING criado |
 | `payment.completed` | Pagamento aprovado (COMPLETED) |
-| `payment.failed` | Pagamento reembolsado (REFUNDED) |
+| `payment.failed` | Pagamento reembolsado (REFUNDED) ou rejeitado |
 
 ### Consumer (PaymentAPI escuta)
 
-| Tópico | Ação |
-|--------|------|
-| `order.created` | Cria pagamento PENDING automaticamente |
-| `order.cancelled` | Reembolsa pagamento automaticamente |
+| Tópico | Ação | Status |
+|--------|------|--------|
+| `order.created` | Cria pagamento PENDING automaticamente | ⚠️ Apenas log — a implementar |
+| `order.cancelled` | Reembolsa pagamento automaticamente | ⚠️ Apenas log — a implementar |
 
 ---
 
-## 7. Segurança
+## 7. Integração Mercado Pago
+
+### Configuração
+
+| Variável | Descrição |
+|----------|-----------|
+| `MERCADOPAGO_ACCESS_TOKEN` | Access token (sandbox ou produção) |
+| `MERCADOPAGO_PUBLIC_KEY` | Public key (usada no frontend MP.js) |
+
+O SDK é auto-configurado no `@PostConstruct` do `MercadoPagoGateway`.
+
+### Modo simulado
+
+Quando `MERCADOPAGO_ACCESS_TOKEN` não está configurado (ex: ambiente de testes), o gateway opera em modo simulado:
+- Cartão: retorna `approved` com ID fake
+- PIX: retorna QR Code simulado
+- Reembolso: retorna `refunded`
+- Consulta: retorna `approved`
+
+### Idempotência
+
+Todas as chamadas ao Mercado Pago usam `X-Idempotency-Key` com o UUID do pagamento local (`payment.getId()`), garantindo que requisições duplicadas não criem pagamentos duplicados.
+
+### Webhook IPN
+
+Endpoint: `POST /api/v1/payments/webhook` (público, sem auth).
+O `PaymentStatusSyncService` processa o webhook:
+1. Extrai `data.id` do payload
+2. Busca pagamento local por `gatewayTransactionId`
+3. Consulta status atual no Mercado Pago via `GET /v1/payments/{id}`
+4. Atualiza status local (COMPLETED / FAILED)
+5. Emite evento Kafka correspondente
+
+---
+
+## 8. Segurança
 
 - **Autenticação:** JWT Bearer token (compartilhado com user-api)
 - **Autorização:** `@PreAuthorize("isAuthenticated()")` em todos os endpoints
+- **Exceções:** `/actuator/health/**`, `/swagger-ui/**`, `/v3/api-docs/**` e `/api/v1/payments/webhook`
 - **Rate Limiting:** Bucket4j via `RateLimitFilter` (a implementar)
 - **JWT Secret:** `JWT_SECRET` via variável de ambiente
 
 ---
 
-## 8. Deploy
+## 9. Deploy
 
 ### Docker Compose (isolado)
 ```bash
 cd payment-api
+export MERCADOPAGO_ACCESS_TOKEN="TEST-..."
+export MERCADOPAGO_PUBLIC_KEY="TEST-..."
 docker compose up -d
 ```
 
@@ -171,7 +313,7 @@ docker compose up -d
 
 ---
 
-## 9. Testes
+## 10. Testes
 
 - **70 testes** cobrindo:
   - Domain (Payment, PaymentStatus)
@@ -180,5 +322,5 @@ docker compose up -d
   - Repository JPA (7 cenários)
   - Entity Mapper (5 cenários)
   - Kafka Producer (4 cenários)
-  - Integração (8 cenários E2E)
+  - Integração (8 cenários E2E — usa modo simulado do Mercado Pago)
 - **JaCoCo**: mínimo 85% line coverage, 60% branch coverage

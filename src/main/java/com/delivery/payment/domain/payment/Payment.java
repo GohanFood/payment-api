@@ -20,6 +20,14 @@ public class Payment {
     private String paymentMethod;
     private PaymentStatus status;
     private String gatewayTransactionId;
+    private Long mpPaymentId;
+    private String qrCode;
+    private String qrCodeBase64;
+    private String ticketUrl;
+    private String payerEmail;
+    private String payerDocumentType;
+    private String payerDocumentNumber;
+    private LocalDateTime expiresAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -38,5 +46,21 @@ public class Payment {
 
     public void markAsRefunded() {
         this.status = PaymentStatus.REFUNDED;
+    }
+
+    public void linkMercadoPago(Long mpPaymentId, String qrCode, String qrCodeBase64, String ticketUrl, LocalDateTime expiresAt) {
+        this.mpPaymentId = mpPaymentId;
+        this.qrCode = qrCode;
+        this.qrCodeBase64 = qrCodeBase64;
+        this.ticketUrl = ticketUrl;
+        this.expiresAt = expiresAt;
+    }
+
+    public boolean isPix() {
+        return "PIX".equalsIgnoreCase(paymentMethod);
+    }
+
+    public boolean isPending() {
+        return PaymentStatus.PENDING.equals(status);
     }
 }

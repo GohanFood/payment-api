@@ -1,5 +1,6 @@
 package com.delivery.payment.advice;
 
+import com.delivery.payment.domain.payment.exception.GatewayUnavailableException;
 import com.delivery.payment.domain.payment.exception.InvalidPaymentAmountException;
 import com.delivery.payment.domain.payment.exception.PaymentAlreadyProcessedException;
 import com.delivery.payment.domain.payment.exception.PaymentNotFoundException;
@@ -27,6 +28,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidPaymentAmountException.class)
     public ResponseEntity<ErrorResponse> handleInvalidPaymentAmount(InvalidPaymentAmountException ex) {
         return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    @ExceptionHandler(GatewayUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleGatewayUnavailable(GatewayUnavailableException ex) {
+        return buildResponse(HttpStatus.BAD_GATEWAY, ex.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

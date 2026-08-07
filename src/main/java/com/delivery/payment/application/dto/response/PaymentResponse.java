@@ -23,6 +23,14 @@ public class PaymentResponse {
     private String paymentMethod;
     private PaymentStatus status;
     private String gatewayTransactionId;
+    private Long mpPaymentId;
+    private String qrCode;
+    private String qrCodeBase64;
+    private String ticketUrl;
+    private String payerEmail;
+    private String payerDocumentType;
+    private String payerDocumentNumber;
+    private LocalDateTime expiresAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

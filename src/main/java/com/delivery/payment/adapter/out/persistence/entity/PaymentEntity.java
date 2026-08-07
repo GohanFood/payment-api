@@ -41,6 +41,30 @@ public class PaymentEntity {
     @Column(name = "gateway_transaction_id")
     private String gatewayTransactionId;
 
+    @Column(name = "mp_payment_id")
+    private Long mpPaymentId;
+
+    @Column(name = "qr_code", columnDefinition = "TEXT")
+    private String qrCode;
+
+    @Column(name = "qr_code_base64", columnDefinition = "TEXT")
+    private String qrCodeBase64;
+
+    @Column(name = "ticket_url")
+    private String ticketUrl;
+
+    @Column(name = "payer_email")
+    private String payerEmail;
+
+    @Column(name = "payer_document_type")
+    private String payerDocumentType;
+
+    @Column(name = "payer_document_number")
+    private String payerDocumentNumber;
+
+    @Column(name = "expires_at")
+    private LocalDateTime expiresAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

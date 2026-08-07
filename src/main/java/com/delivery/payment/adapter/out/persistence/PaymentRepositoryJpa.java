@@ -45,6 +45,23 @@ public class PaymentRepositoryJpa implements PaymentRepository {
     }
 
     @Override
+    public Optional<Payment> findByMpPaymentId(Long mpPaymentId) {
+        return jpaRepository.findByMpPaymentId(mpPaymentId).map(mapper::toDomain);
+    }
+
+    @Override
+    public Optional<Payment> findByGatewayTransactionId(String gatewayTransactionId) {
+        return jpaRepository.findByGatewayTransactionId(gatewayTransactionId).map(mapper::toDomain);
+    }
+
+    @Override
+    public List<Payment> findAll() {
+        return jpaRepository.findAll().stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
     public void delete(Payment payment) {
         jpaRepository.deleteById(payment.getId());
     }

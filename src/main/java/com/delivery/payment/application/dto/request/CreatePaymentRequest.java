@@ -28,4 +28,12 @@ public class CreatePaymentRequest {
 
     @NotNull
     private String paymentMethod;
+
+    // --- Dados do pagador (obrigatórios para PIX via Mercado Pago) ---
+
+    private String payerEmail;
+    private String payerFirstName;
+    private String payerLastName;
+    private String payerDocumentType;
+    private String payerDocumentNumber;
 }

@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  payment-api:
+    build:
+      context: .
+    container_name: payment-api
+    ports:
+      - "8082:8082"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-payment:5432/paymentdb
+      - SPRING_DATASOURCE_USERNAME=paymentapi
+      - SPRING_DATASOURCE_PASSWORD=paymentapi123
+      - JWT_SECRET=${JWT_SECRET:-dev-secret-key}
+    depends_on:
+      postgres-payment:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - payment-network
+
+  postgres-payment:
+    image: postgres:16-alpine
+    container_name: payment-api-db
+    ports:
+      - "5434:5432"
+    environment:
+      - POSTGRES_DB=paymentdb
+      - POSTGRES_USER=paymentapi
+      - POSTGRES_PASSWORD=paymentapi123
+    volumes:
+      - postgres-payment-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paymentapi -d paymentdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - payment-network
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.7.1
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - payment-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.7.1
+    container_name: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    depends_on:
+      - zookeeper
+    networks:
+      - payment-network
+
+volumes:
+  postgres-payment-data:
+
+networks:
+  payment-network:
+    driver: bridge

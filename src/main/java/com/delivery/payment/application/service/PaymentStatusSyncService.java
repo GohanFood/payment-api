@@ -70,13 +70,12 @@ public class PaymentStatusSyncService {
 
         // Atualiza status local
         if (mpStatus.isApproved()) {
-            // Se ainda não tem gatewayTransactionId, associa
-            if (payment.getGatewayTransactionId() == null) {
-                payment.markAsCompleted(mpPaymentId);
-            }
+            // isFinalStatus no início do método já previne reprocessamento
+            payment.markAsCompleted(mpPaymentId);
             Payment updated = paymentRepository.save(payment);
             paymentMessagingPort.publishPaymentCompleted(updated.getId(), updated.getOrderId());
-            log.info("Pagamento aprovado via webhook: paymentId={}", payment.getId());
+            log.info("Pagamento aprovado via webhook: paymentId={}, mpPaymentId={}",
+                    payment.getId(), mpPaymentId);
 
         } else if (mpStatus.isRejected()) {
             payment.markAsFailed();

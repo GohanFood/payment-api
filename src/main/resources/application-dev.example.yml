@@ -1,0 +1,32 @@
+# ============================================================================
+# TEMPLATE: application-dev.yml
+# ============================================================================
+# Copie este arquivo para application-dev.yml e preencha com suas credenciais:
+#
+#   cp src/main/resources/application-dev.example.yml \
+#      src/main/resources/application-dev.yml
+#
+# O arquivo application-dev.yml NÃO é versionado (.gitignore).
+# ============================================================================
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5433/paymentdb
+
+  kafka:
+    bootstrap-servers: localhost:9092
+
+  flyway:
+    enabled: true
+
+# ---------------------------------------------------------------------------
+# Mercado Pago Sandbox — Credenciais de TESTE
+# ---------------------------------------------------------------------------
+# Obtenha em: https://www.mercadopago.com.br/settings/account/credentials
+# Use SEMPRE tokens com prefixo TEST- (sandbox).
+#
+# Cartões de teste: https://www.mercadopago.com.br/developers/pt/docs/checkout-api-payments/additional-content/your-integrations/test/cards
+mercadopago:
+  access-token: TEST-SEU_ACCESS_TOKEN_AQUI
+  public-key: TEST-SUA_PUBLIC_KEY_AQUI
+  webhook-secret: ""  # opcional em dev

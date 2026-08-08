@@ -2,6 +2,7 @@ package com.delivery.payment.application.service;
 
 import com.delivery.payment.domain.payment.Payment;
 import com.delivery.payment.domain.payment.PaymentStatus;
+import com.delivery.payment.domain.payment.exception.PaymentAlreadyProcessedException;
 import com.delivery.payment.domain.payment.exception.PaymentNotFoundException;
 import com.delivery.payment.port.PaymentMessagingPort;
 import com.delivery.payment.port.PaymentRepository;
@@ -71,7 +72,7 @@ class RefundPaymentServiceTest {
 
         assertNotNull(result);
         assertEquals(PaymentStatus.REFUNDED, result.getStatus());
-        verify(paymentMessagingPort).publishPaymentFailed(eq(paymentId), eq(orderId));
+        verify(paymentMessagingPort).publishPaymentRefunded(eq(paymentId), eq(orderId));
     }
 
     @Test
@@ -84,7 +85,7 @@ class RefundPaymentServiceTest {
     }
 
     @Test
-    void shouldRefundPendingPayment() {
+    void shouldRejectRefundOfPendingPayment() {
         UUID paymentId = UUID.randomUUID();
         Payment pending = Payment.builder()
                 .id(paymentId)
@@ -98,10 +99,10 @@ class RefundPaymentServiceTest {
                 .build();
 
         when(paymentRepository.findById(paymentId)).thenReturn(Optional.of(pending));
-        when(paymentRepository.save(any())).thenReturn(pending);
 
-        Payment result = service.execute(paymentId);
-        assertEquals(PaymentStatus.REFUNDED, result.getStatus());
+        assertThrows(PaymentAlreadyProcessedException.class, () -> service.execute(paymentId));
+        verify(paymentRepository, never()).save(any());
+        verify(paymentMessagingPort, never()).publishPaymentRefunded(any(), any());
     }
 
     @Test
@@ -124,6 +125,6 @@ class RefundPaymentServiceTest {
 
         Payment result = service.execute(paymentId);
         assertEquals(PaymentStatus.REFUNDED, result.getStatus());
-        verify(paymentMessagingPort).publishPaymentFailed(any(), any());
+        verify(paymentMessagingPort).publishPaymentRefunded(any(), any());
     }
 }

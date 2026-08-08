@@ -4,8 +4,8 @@ spring:
 
   datasource:
     url: jdbc:postgresql://localhost:5434/paymentdb
-    username: paymentapi
-    password: paymentapi123
+    username: ${SPRING_DATASOURCE_USERNAME:paymentapi}
+    password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -35,14 +35,18 @@ jwt:
   secret: ${JWT_SECRET}
 
 # ---------------------------------------------------------------------------
-# Mercado Pago — Gateway de Pagamento via Cartão
+# Mercado Pago — Exclusivamente SANDBOX
 # ---------------------------------------------------------------------------
-# Access Token (obrigatório): gere em https://www.mercadopago.com.br/settings/account/credentials
-#   TEST (sandbox) para testes | PROD para transações reais
-# Public Key: usada no frontend para inicializar MercadoPago.js CardForm
+# Environment: fixo como "sandbox". Tokens de produção (APP_USR-) são rejeitados.
+# Access Token: gere em https://www.mercadopago.com.br/settings/account/credentials
+#   Use SEMPRE um token de teste (prefixo TEST-).
+# Public Key: chave pública sandbox usada no frontend (MercadoPago.js CardForm)
+# Webhook Secret: chave secreta para validação HMAC-SHA256 dos webhooks
 mercadopago:
+  environment: ${MERCADOPAGO_ENVIRONMENT:sandbox}
   access-token: ${MERCADOPAGO_ACCESS_TOKEN:}
   public-key: ${MERCADOPAGO_PUBLIC_KEY:}
+  webhook-secret: ${MERCADOPAGO_WEBHOOK_SECRET:}
 
 server:
   port: 8082

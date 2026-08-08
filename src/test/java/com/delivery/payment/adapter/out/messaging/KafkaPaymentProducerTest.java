@@ -57,6 +57,16 @@ class KafkaPaymentProducerTest {
     }
 
     @Test
+    void shouldPublishPaymentRefunded() {
+        UUID paymentId = UUID.randomUUID();
+        UUID orderId = UUID.randomUUID();
+
+        producer.publishPaymentRefunded(paymentId, orderId);
+
+        verify(kafkaTemplate).send(eq("payment.refunded"), eq(paymentId.toString()), anyString());
+    }
+
+    @Test
     void shouldIncludePaymentAndOrderIdInMessage() {
         UUID paymentId = UUID.randomUUID();
         UUID orderId = UUID.randomUUID();

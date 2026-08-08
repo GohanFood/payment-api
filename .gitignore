@@ -16,6 +16,7 @@ target/
 
 # Environment
 .env
+application-dev.yml
 
 # IDE
 .vscode/

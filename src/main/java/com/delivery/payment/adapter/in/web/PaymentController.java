@@ -6,7 +6,9 @@ import com.delivery.payment.application.dto.request.RefundPaymentRequest;
 import com.delivery.payment.application.dto.response.PaymentResponse;
 import com.delivery.payment.application.usecase.*;
 import com.delivery.payment.application.service.PaymentStatusSyncService;
+import com.delivery.payment.config.MercadoPagoWebhookValidator;
 import com.delivery.payment.domain.payment.Payment;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +33,8 @@ public class PaymentController {
     private final ListPaymentsUseCase listPaymentsUseCase;
     private final RefundPaymentUseCase refundPaymentUseCase;
     private final PaymentStatusSyncService paymentStatusSyncService;
+    private final MercadoPagoWebhookValidator webhookValidator;
+    private final ObjectMapper objectMapper;
 
     @PostMapping
     @PreAuthorize("isAuthenticated()")
@@ -66,8 +70,11 @@ public class PaymentController {
 
     @GetMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<PaymentResponse>> listByUser(@RequestParam UUID userId) {
-        List<Payment> payments = listPaymentsUseCase.execute(userId);
+    public ResponseEntity<List<PaymentResponse>> listByUser(
+            @RequestParam UUID userId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        List<Payment> payments = listPaymentsUseCase.execute(userId, page, size);
         return ResponseEntity.ok(payments.stream().map(this::toResponse).toList());
     }
 
@@ -82,25 +89,47 @@ public class PaymentController {
      * Webhook para notificações do Mercado Pago (IPN - Instant Payment Notification).
      * Endpoint público — o Mercado Pago envia notificações de mudança de status.
      *
-     * Formato esperado do body (Mercado Pago):
+     * <h3>Headers esperados:</h3>
+     * <ul>
+     *   <li>{@code x-signature}: assinatura HMAC-SHA256 (formato: {@code ts=...,v1=...})</li>
+     *   <li>{@code x-request-id}: ID único da requisição (opcional)</li>
+     * </ul>
+     *
+     * <h3>Formato esperado do body:</h3>
+     * <pre>{@code
      * {
      *   "id": 123456789,
      *   "type": "payment",
      *   "action": "payment.updated",
      *   "data": { "id": "123456789" }
      * }
+     * }</pre>
      *
-     * @see <a href="https://www.mercadopago.com.br/developers/pt/docs/checkout-api-payments/additional-content/your-integrations/notifications">Notificações Mercado Pago</a>
+     * @see <a href="https://www.mercadopago.com.br/developers/pt/docs/your-integrations/notifications/webhooks">Validação de Webhooks</a>
      */
     @PostMapping("/webhook")
-    public ResponseEntity<Void> webhook(@RequestBody Map<String, Object> payload) {
-        log.info("Webhook Mercado Pago recebido: {}", payload);
+    public ResponseEntity<Void> webhook(
+            @RequestBody String rawPayload,
+            @RequestHeader(value = "x-signature", required = false) String xSignature,
+            @RequestHeader(value = "x-request-id", required = false) String xRequestId) {
+
+        log.info("Webhook Mercado Pago recebido: x-request-id={}", xRequestId);
 
         try {
+            Map<String, Object> payload = objectMapper.readValue(rawPayload, Map.class);
+
             @SuppressWarnings("unchecked")
             Map<String, Object> data = (Map<String, Object>) payload.get("data");
-            if (data != null && data.get("id") != null) {
-                String mpPaymentId = data.get("id").toString();
+            String mpPaymentId = data != null && data.get("id") != null
+                    ? data.get("id").toString() : null;
+
+            // Valida assinatura do webhook conforme especificação do Mercado Pago
+            if (!webhookValidator.isValid(rawPayload, xSignature, xRequestId, mpPaymentId)) {
+                log.warn("Webhook com assinatura inválida: x-request-id={}", xRequestId);
+                return ResponseEntity.ok().build();
+            }
+
+            if (mpPaymentId != null) {
                 paymentStatusSyncService.handleWebhookNotification(mpPaymentId);
             } else {
                 log.warn("Webhook sem data.id: {}", payload);

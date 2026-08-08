@@ -1,9 +1,0 @@
-spring:
-  datasource:
-    url: jdbc:postgresql://localhost:5433/paymentdb
-
-  kafka:
-    bootstrap-servers: localhost:9092
-
-  flyway:
-    enabled: true

@@ -7,4 +7,8 @@ import java.util.UUID;
 
 public interface ListPaymentsUseCase {
     List<Payment> execute(UUID userId);
+
+    List<Payment> execute(UUID userId, int page, int size);
+
+    long countByUserId(UUID userId);
 }

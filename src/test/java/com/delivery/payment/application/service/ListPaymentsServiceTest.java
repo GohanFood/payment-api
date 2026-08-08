@@ -56,7 +56,7 @@ class ListPaymentsServiceTest {
                 .updatedAt(LocalDateTime.now())
                 .build();
 
-        when(paymentRepository.findByUserId(userId)).thenReturn(List.of(p1, p2));
+        when(paymentRepository.findByUserId(eq(userId), eq(0), eq(20))).thenReturn(List.of(p1, p2));
 
         List<Payment> result = service.execute(userId);
 
@@ -68,7 +68,7 @@ class ListPaymentsServiceTest {
     @Test
     void shouldReturnEmptyListWhenNoPayments() {
         UUID userId = UUID.randomUUID();
-        when(paymentRepository.findByUserId(userId)).thenReturn(Collections.emptyList());
+        when(paymentRepository.findByUserId(eq(userId), eq(0), eq(20))).thenReturn(Collections.emptyList());
 
         List<Payment> result = service.execute(userId);
 
@@ -89,7 +89,7 @@ class ListPaymentsServiceTest {
                 .updatedAt(LocalDateTime.now())
                 .build();
 
-        when(paymentRepository.findByUserId(userId)).thenReturn(List.of(payment));
+        when(paymentRepository.findByUserId(eq(userId), eq(0), eq(20))).thenReturn(List.of(payment));
 
         List<Payment> result = service.execute(userId);
 

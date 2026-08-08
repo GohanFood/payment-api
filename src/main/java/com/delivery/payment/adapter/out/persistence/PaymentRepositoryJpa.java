@@ -5,6 +5,8 @@ import com.delivery.payment.adapter.out.persistence.mapper.PaymentEntityMapper;
 import com.delivery.payment.domain.payment.Payment;
 import com.delivery.payment.port.PaymentRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -35,6 +37,20 @@ public class PaymentRepositoryJpa implements PaymentRepository {
         return jpaRepository.findByUserId(userId).stream()
                 .map(mapper::toDomain)
                 .toList();
+    }
+
+    @Override
+    public List<Payment> findByUserId(UUID userId, int page, int size) {
+        return jpaRepository.findByUserId(userId,
+                        PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")))
+                .stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
+    public long countByUserId(UUID userId) {
+        return jpaRepository.countByUserId(userId);
     }
 
     @Override

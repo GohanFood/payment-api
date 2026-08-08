@@ -4,6 +4,7 @@ import com.delivery.payment.application.dto.response.PixPaymentResponse;
 import com.delivery.payment.application.usecase.CreatePaymentUseCase;
 import com.delivery.payment.domain.payment.Payment;
 import com.delivery.payment.domain.payment.PaymentStatus;
+import com.delivery.payment.domain.payment.exception.GatewayUnavailableException;
 import com.delivery.payment.domain.payment.exception.InvalidPaymentAmountException;
 import com.delivery.payment.port.PaymentGatewayPort;
 import com.delivery.payment.port.PaymentMessagingPort;
@@ -77,8 +78,9 @@ public class CreatePaymentService implements CreatePaymentUseCase {
                         newPayment.getId(), mpResponse.getMpPaymentId());
             } catch (Exception e) {
                 log.error("Falha ao integrar com Mercado Pago para paymentId={}: {}",
-                        newPayment.getId(), e.getMessage());
-                // Não lança exceção — o pagamento fica PENDING e pode ser reprocessado
+                        newPayment.getId(), e.getMessage(), e);
+                throw new GatewayUnavailableException(
+                        "Falha ao criar pagamento PIX no Mercado Pago: " + e.getMessage(), e);
             }
         }
 

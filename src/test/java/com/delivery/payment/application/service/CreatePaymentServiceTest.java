@@ -1,5 +1,6 @@
 package com.delivery.payment.application.service;
 
+import com.delivery.payment.application.dto.response.PixPaymentResponse;
 import com.delivery.payment.domain.payment.Payment;
 import com.delivery.payment.domain.payment.PaymentStatus;
 import com.delivery.payment.domain.payment.exception.InvalidPaymentAmountException;
@@ -151,6 +152,16 @@ class CreatePaymentServiceTest {
                 .updatedAt(LocalDateTime.now())
                 .build();
 
+        PixPaymentResponse mpResponse = PixPaymentResponse.builder()
+                .mpPaymentId(123L)
+                .status("pending")
+                .qrCode("test-qr-code")
+                .qrCodeBase64("test-base64")
+                .ticketUrl("https://mp.com/ticket")
+                .build();
+
+        when(paymentGatewayPort.createPixPayment(any(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(mpResponse);
         when(paymentRepository.save(any())).thenReturn(saved);
 
         Payment result = service.execute(input);

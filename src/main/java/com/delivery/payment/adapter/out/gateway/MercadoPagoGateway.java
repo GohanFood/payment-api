@@ -14,6 +14,7 @@ import com.mercadopago.core.MPRequestOptions;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -21,45 +22,79 @@ import java.util.Map;
 
 /**
  * Adapter que implementa a integração com a API de pagamentos do Mercado Pago
- * para PIX (QR Code) e Cartão de Crédito/Débito (CardForm + CardToken).
+ * para PIX (QR Code) e Cartão de Crédito/Débito (CardForm + CardToken) —
+ * exclusivamente no ambiente <b>SANDBOX</b>.
  *
  * <h3>Fluxo Cartão:</h3>
  * <ol>
  *   <li>Frontend captura dados do cartão via MercadoPago.js CardForm → gera CardToken</li>
  *   <li>Frontend envia CardToken + dados do comprador para nosso backend</li>
- *   <li>Backend chama processCardPayment() → Mercado Pago API POST /v1/payments</li>
+ *   <li>Backend chama processCardPayment() → Mercado Pago Sandbox API POST /v1/payments</li>
  *   <li>Mercado Pago retorna status: approved, rejected, in_process, pending</li>
  * </ol>
  *
  * <h3>Fluxo PIX:</h3>
  * <ol>
- *   <li>Backend chama createPixPayment() → Mercado Pago API POST /v1/payments</li>
+ *   <li>Backend chama createPixPayment() → Mercado Pago Sandbox API POST /v1/payments</li>
  *   <li>Mercado Pago retorna QR Code (base64 + texto) e ticket_url</li>
  *   <li>Frontend exibe QR Code para o comprador pagar</li>
  * </ol>
+ *
+ * <h3>Credenciais:</h3>
+ * <p>Tokens de produção ({@code APP_USR-}) são <b>rejeitados</b> na inicialização.
+ * Use tokens sandbox com prefixo {@code TEST-} obtidos em:
+ * <a href="https://www.mercadopago.com.br/settings/account/credentials">Mercado Pago Credentials</a></p>
  *
  * @see <a href="https://www.mercadopago.com.br/developers/pt/docs/checkout-api-payments/integration-configuration/card/integrate-via-cardform">Cartão via CardForm</a>
  * @see <a href="https://www.mercadopago.com.br/developers/pt/reference/payments/_payments/post">API Reference</a>
  */
 @Slf4j
 @Component
+@Profile("!test")
 @RequiredArgsConstructor
 public class MercadoPagoGateway
         implements com.delivery.payment.port.PaymentGatewayPort,
                    com.delivery.payment.domain.payment.gateway.PaymentGatewayPort {
 
+    private static final String TOKEN_PREFIX_SANDBOX = "TEST-";
+    private static final String TOKEN_PREFIX_PRODUCTION = "APP_USR-";
+
     private final MercadoPagoProperties properties;
-    private boolean simulationMode = false;
+    private boolean ready = false;
 
     @PostConstruct
     public void init() {
-        if (properties.getAccessToken() != null && !properties.getAccessToken().isBlank()) {
-            MercadoPagoConfig.setAccessToken(properties.getAccessToken());
-            log.info("Mercado Pago SDK inicializado com access token configurado");
-        } else {
-            simulationMode = true;
-            log.warn("Mercado Pago access token não configurado! Usando modo simulado.");
+        if (!properties.isTokenConfigured()) {
+            log.warn("============================================================");
+            log.warn("  Mercado Pago Sandbox: access token NÃO configurado!");
+            log.warn("  Configure a env var MERCADOPAGO_ACCESS_TOKEN com um");
+            log.warn("  token de sandbox (prefixo {}).", TOKEN_PREFIX_SANDBOX);
+            log.warn("  Obtenha suas credenciais em:");
+            log.warn("  https://www.mercadopago.com.br/settings/account/credentials");
+            log.warn("  Enquanto isso, chamadas ao gateway lançarão exceção.");
+            log.warn("============================================================");
+            return;
         }
+
+        if (properties.isProductionToken()) {
+            log.error("============================================================");
+            log.error("  TOKEN DE PRODUÇÃO DETECTADO — API configurada só para SANDBOX!");
+            log.error("  O token '{}' começa com '{}' (produção).",
+                    maskToken(properties.getAccessToken()), TOKEN_PREFIX_PRODUCTION);
+            log.error("  Substitua por um token sandbox (prefixo {}).", TOKEN_PREFIX_SANDBOX);
+            log.error("============================================================");
+            throw new IllegalStateException(
+                    "Token de produção detectado. Esta API só aceita sandbox (TEST-).");
+        }
+
+        if (!properties.isSandboxToken()) {
+            log.warn("Token Mercado Pago não parece ser de sandbox (esperado prefixo '{}').", TOKEN_PREFIX_SANDBOX);
+        }
+
+        MercadoPagoConfig.setAccessToken(properties.getAccessToken());
+
+        ready = true;
+        log.info("Mercado Pago Sandbox inicializado com sucesso. Token: {}", maskToken(properties.getAccessToken()));
     }
 
     // ──────────────────────────────────────────────
@@ -77,18 +112,9 @@ public class MercadoPagoGateway
             String documentType,
             String documentNumber) {
 
-        if (simulationMode) {
-            log.info("Mercado Pago em modo simulado: criando PIX amount={}", amount);
-            return PixPaymentResponse.builder()
-                    .mpPaymentId(-1L)
-                    .status("pending")
-                    .qrCode("00020126580014br.gov.bcb.pix0136simulado@mercadopago.com.br")
-                    .qrCodeBase64("simulado-base64")
-                    .ticketUrl("https://www.mercadopago.com.br/payments/simulado/ticket")
-                    .build();
-        }
+        assertReady();
 
-        log.info("Criando pagamento PIX no Mercado Pago: amount={}, email={}", amount, payerEmail);
+        log.info("Criando pagamento PIX no Mercado Pago Sandbox: amount={}, email={}", amount, payerEmail);
 
         try {
             PaymentClient client = new PaymentClient();
@@ -114,7 +140,7 @@ public class MercadoPagoGateway
 
             com.mercadopago.resources.payment.Payment mpPayment = client.create(createRequest, requestOptions);
 
-            log.info("Pagamento PIX criado no Mercado Pago: mpPaymentId={}, status={}",
+            log.info("Pagamento PIX criado no Mercado Pago Sandbox: mpPaymentId={}, status={}",
                     mpPayment.getId(), mpPayment.getStatus());
 
             String qrCode = null;
@@ -139,7 +165,7 @@ public class MercadoPagoGateway
                     .build();
 
         } catch (Exception e) {
-            log.error("Erro ao criar pagamento PIX no Mercado Pago", e);
+            log.error("Erro ao criar pagamento PIX no Mercado Pago Sandbox", e);
             throw new GatewayUnavailableException(
                     "Falha ao criar pagamento PIX no Mercado Pago: " + e.getMessage(), e);
         }
@@ -151,17 +177,9 @@ public class MercadoPagoGateway
 
     @Override
     public PaymentGatewayResponse processCardPayment(PaymentGatewayRequest request) {
-        if (simulationMode) {
-            log.info("Mercado Pago em modo simulado: processando cartão amount={}", request.getTransactionAmount());
-            return PaymentGatewayResponse.builder()
-                    .externalId("SIM-" + System.currentTimeMillis())
-                    .externalStatus("approved")
-                    .externalStatusDetail("accredited")
-                    .paymentTypeId("credit_card")
-                    .build();
-        }
+        assertReady();
 
-        log.info("Processando pagamento via Mercado Pago: amount={}, method={}, installments={}",
+        log.info("Processando pagamento via Mercado Pago Sandbox: amount={}, method={}, installments={}",
                 request.getTransactionAmount(), request.getPaymentMethodId(), request.getInstallments());
 
         try {
@@ -183,7 +201,7 @@ public class MercadoPagoGateway
 
             com.mercadopago.resources.payment.Payment mpPayment = client.create(mpRequest, requestOptions);
 
-            log.info("Resposta Mercado Pago Cartão: id={}, status={}, statusDetail={}",
+            log.info("Resposta Mercado Pago Sandbox Cartão: id={}, status={}, statusDetail={}",
                     mpPayment.getId(), mpPayment.getStatus(), mpPayment.getStatusDetail());
 
             return PaymentGatewayResponse.builder()
@@ -198,7 +216,7 @@ public class MercadoPagoGateway
                     .build();
 
         } catch (Exception e) {
-            log.error("Erro ao processar pagamento no Mercado Pago", e);
+            log.error("Erro ao processar pagamento no Mercado Pago Sandbox", e);
             throw new GatewayUnavailableException(
                     "Falha na comunicação com o gateway de pagamento: " + e.getMessage(), e);
         }
@@ -206,15 +224,9 @@ public class MercadoPagoGateway
 
     @Override
     public PaymentGatewayResponse refundPayment(String gatewayPaymentId) {
-        if (simulationMode) {
-            log.info("Mercado Pago em modo simulado: reembolsando paymentId={}", gatewayPaymentId);
-            return PaymentGatewayResponse.builder()
-                    .externalId(gatewayPaymentId)
-                    .externalStatus("refunded")
-                    .build();
-        }
+        assertReady();
 
-        log.info("Reembolsando pagamento no Mercado Pago: gatewayPaymentId={}", gatewayPaymentId);
+        log.info("Reembolsando pagamento no Mercado Pago Sandbox: gatewayPaymentId={}", gatewayPaymentId);
 
         try {
             PaymentClient client = new PaymentClient();
@@ -222,7 +234,7 @@ public class MercadoPagoGateway
 
             com.mercadopago.resources.payment.PaymentRefund refund = client.refund(paymentId);
 
-            log.info("Reembolso Mercado Pago: refundId={}, paymentId={}, status={}",
+            log.info("Reembolso Mercado Pago Sandbox: refundId={}, paymentId={}, status={}",
                     refund.getId(), refund.getPaymentId(), refund.getStatus());
 
             return PaymentGatewayResponse.builder()
@@ -231,7 +243,7 @@ public class MercadoPagoGateway
                     .build();
 
         } catch (Exception e) {
-            log.error("Erro ao reembolsar pagamento no Mercado Pago: paymentId={}", gatewayPaymentId, e);
+            log.error("Erro ao reembolsar pagamento no Mercado Pago Sandbox: paymentId={}", gatewayPaymentId, e);
             throw new GatewayUnavailableException(
                     "Falha ao reembolsar no gateway de pagamento: " + e.getMessage(), e);
         }
@@ -239,16 +251,9 @@ public class MercadoPagoGateway
 
     @Override
     public PaymentGatewayResponse getPayment(String gatewayPaymentId) {
-        if (simulationMode) {
-            log.info("Mercado Pago em modo simulado: consultando paymentId={}", gatewayPaymentId);
-            return PaymentGatewayResponse.builder()
-                    .externalId(gatewayPaymentId)
-                    .externalStatus("approved")
-                    .externalStatusDetail("accredited")
-                    .build();
-        }
+        assertReady();
 
-        log.info("Consultando pagamento no Mercado Pago: gatewayPaymentId={}", gatewayPaymentId);
+        log.info("Consultando pagamento no Mercado Pago Sandbox: gatewayPaymentId={}", gatewayPaymentId);
 
         try {
             PaymentClient client = new PaymentClient();
@@ -256,7 +261,7 @@ public class MercadoPagoGateway
 
             com.mercadopago.resources.payment.Payment mpPayment = client.get(paymentId);
 
-            log.info("Status Mercado Pago: id={}, status={}, statusDetail={}",
+            log.info("Status Mercado Pago Sandbox: id={}, status={}, statusDetail={}",
                     mpPayment.getId(), mpPayment.getStatus(), mpPayment.getStatusDetail());
 
             return PaymentGatewayResponse.builder()
@@ -271,7 +276,7 @@ public class MercadoPagoGateway
                     .build();
 
         } catch (Exception e) {
-            log.error("Erro ao consultar pagamento no Mercado Pago: paymentId={}", gatewayPaymentId, e);
+            log.error("Erro ao consultar pagamento no Mercado Pago Sandbox: paymentId={}", gatewayPaymentId, e);
             throw new GatewayUnavailableException(
                     "Falha ao consultar pagamento no gateway: " + e.getMessage(), e);
         }
@@ -295,5 +300,26 @@ public class MercadoPagoGateway
         }
 
         return builder.build();
+    }
+
+    /**
+     * Verifica se o gateway está pronto para operar.
+     * Lança exceção se o token sandbox não foi configurado.
+     */
+    private void assertReady() {
+        if (!ready) {
+            throw new GatewayUnavailableException(
+                    "Mercado Pago Sandbox não configurado. Configure MERCADOPAGO_ACCESS_TOKEN com um token TEST-.");
+        }
+    }
+
+    /**
+     * Mascara o token para exibição segura em logs (mostra só os primeiros e últimos caracteres).
+     */
+    private String maskToken(String token) {
+        if (token == null || token.length() <= 12) {
+            return "***";
+        }
+        return token.substring(0, 8) + "..." + token.substring(token.length() - 4);
     }
 }

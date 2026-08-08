@@ -175,11 +175,12 @@ class PaymentApiIntegrationTest {
         UUID userId = UUID.randomUUID();
         UUID orderId = UUID.randomUUID();
 
+        // Create payment
         Map<String, Object> createRequest = Map.of(
                 "userId", userId.toString(),
                 "orderId", orderId.toString(),
                 "amount", 300.00,
-                "paymentMethod", "CREDIT_CARD"
+                "paymentMethod", "PIX"
         );
 
         String createResponse = mockMvc.perform(post("/api/v1/payments")
@@ -191,6 +192,19 @@ class PaymentApiIntegrationTest {
 
         String paymentId = objectMapper.readTree(createResponse).get("id").asText();
 
+        // Process payment to COMPLETED before refunding
+        Map<String, Object> processRequest = Map.of(
+                "gatewayToken", "tok-test-refund",
+                "payerEmail", "test@email.com"
+        );
+
+        mockMvc.perform(post("/api/v1/payments/" + paymentId + "/process")
+                        .header("Authorization", "Bearer " + jwtToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(processRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED"));
+
         // Refund
         Map<String, Object> refundRequest = Map.of("paymentId", paymentId);
 
@@ -200,6 +214,13 @@ class PaymentApiIntegrationTest {
                         .content(objectMapper.writeValueAsString(refundRequest)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("REFUNDED"));
+
+        // Verify re-refunding returns 409
+        mockMvc.perform(post("/api/v1/payments/refund")
+                        .header("Authorization", "Bearer " + jwtToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(refundRequest)))
+                .andExpect(status().isConflict());
     }
 
     @Test

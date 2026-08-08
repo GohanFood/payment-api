@@ -18,6 +18,7 @@ public class KafkaPaymentProducer implements PaymentMessagingPort {
     private static final String PAYMENT_CREATED_TOPIC = "payment.created";
     private static final String PAYMENT_COMPLETED_TOPIC = "payment.completed";
     private static final String PAYMENT_FAILED_TOPIC = "payment.failed";
+    private static final String PAYMENT_REFUNDED_TOPIC = "payment.refunded";
 
     @Override
     public void publishPaymentCreated(UUID paymentId, UUID orderId) {
@@ -38,6 +39,13 @@ public class KafkaPaymentProducer implements PaymentMessagingPort {
         String message = buildMessage(paymentId, orderId);
         kafkaTemplate.send(PAYMENT_FAILED_TOPIC, paymentId.toString(), message);
         log.info("Published payment.failed: paymentId={}, orderId={}", paymentId, orderId);
+    }
+
+    @Override
+    public void publishPaymentRefunded(UUID paymentId, UUID orderId) {
+        String message = buildMessage(paymentId, orderId);
+        kafkaTemplate.send(PAYMENT_REFUNDED_TOPIC, paymentId.toString(), message);
+        log.info("Published payment.refunded: paymentId={}, orderId={}", paymentId, orderId);
     }
 
     private String buildMessage(UUID paymentId, UUID orderId) {

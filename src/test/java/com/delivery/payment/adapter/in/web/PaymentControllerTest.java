@@ -6,6 +6,7 @@ import com.delivery.payment.application.dto.request.RefundPaymentRequest;
 import com.delivery.payment.application.service.PaymentStatusSyncService;
 import com.delivery.payment.application.usecase.*;
 import com.delivery.payment.config.JwtConfig;
+import com.delivery.payment.config.MercadoPagoWebhookValidator;
 import com.delivery.payment.config.SecurityConfig;
 import com.delivery.payment.domain.payment.Payment;
 import com.delivery.payment.domain.payment.PaymentStatus;
@@ -66,6 +67,9 @@ class PaymentControllerTest {
 
     @MockBean
     private JwtConfig jwtConfig;
+
+    @MockBean
+    private MercadoPagoWebhookValidator webhookValidator;
 
     private String jwtToken;
 
@@ -204,7 +208,7 @@ class PaymentControllerTest {
                 .updatedAt(LocalDateTime.now())
                 .build();
 
-        when(listPaymentsUseCase.execute(userId)).thenReturn(List.of(p1));
+        when(listPaymentsUseCase.execute(eq(userId), eq(0), eq(20))).thenReturn(List.of(p1));
 
         mockMvc.perform(get("/api/v1/payments")
                         .header("Authorization", "Bearer " + jwtToken)

@@ -9,4 +9,6 @@ public interface PaymentMessagingPort {
     void publishPaymentCompleted(UUID paymentId, UUID orderId);
 
     void publishPaymentFailed(UUID paymentId, UUID orderId);
+
+    void publishPaymentRefunded(UUID paymentId, UUID orderId);
 }

@@ -10,11 +10,11 @@ import java.util.UUID;
 
 public interface PaymentJpaRepository extends JpaRepository<PaymentEntity, UUID> {
 
-    List<PaymentEntity> findByUserId(UUID userId);
+    List<PaymentEntity> findByUserId(String userId);
 
-    List<PaymentEntity> findByUserId(UUID userId, Pageable pageable);
+    List<PaymentEntity> findByUserId(String userId, Pageable pageable);
 
-    long countByUserId(UUID userId);
+    long countByUserId(String userId);
 
     List<PaymentEntity> findByOrderId(UUID orderId);
 

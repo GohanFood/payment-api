@@ -14,7 +14,7 @@ import java.util.UUID;
 public class Payment {
 
     private UUID id;
-    private UUID userId;
+    private String userId;
     private UUID orderId;
     private BigDecimal amount;
     private String paymentMethod;

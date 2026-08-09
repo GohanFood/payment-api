@@ -15,6 +15,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -39,17 +41,8 @@ public class PaymentController {
     @PostMapping
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<PaymentResponse> create(@Valid @RequestBody CreatePaymentRequest request) {
-        Payment payment = Payment.builder()
-                .userId(request.getUserId())
-                .orderId(request.getOrderId())
-                .amount(request.getAmount())
-                .paymentMethod(request.getPaymentMethod())
-                .payerEmail(request.getPayerEmail())
-                .payerDocumentType(request.getPayerDocumentType())
-                .payerDocumentNumber(request.getPayerDocumentNumber())
-                .build();
-
-        Payment created = createPaymentUseCase.execute(payment);
+        String userId = getCurrentUserId();
+        Payment created = createPaymentUseCase.execute(request, userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(created));
     }
 
@@ -71,9 +64,9 @@ public class PaymentController {
     @GetMapping
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<PaymentResponse>> listByUser(
-            @RequestParam UUID userId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
+        String userId = getCurrentUserId();
         List<Payment> payments = listPaymentsUseCase.execute(userId, page, size);
         return ResponseEntity.ok(payments.stream().map(this::toResponse).toList());
     }
@@ -140,6 +133,17 @@ public class PaymentController {
 
         // Sempre retorna 200 OK para o Mercado Pago não reenviar
         return ResponseEntity.ok().build();
+    }
+
+    /**
+     * Extrai o userId do token JWT atual (campo "sub").
+     */
+    private String getCurrentUserId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getName() == null) {
+            throw new IllegalStateException("Usuário não autenticado");
+        }
+        return auth.getName();
     }
 
     private PaymentResponse toResponse(Payment payment) {

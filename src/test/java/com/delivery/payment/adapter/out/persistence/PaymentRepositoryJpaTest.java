@@ -37,7 +37,7 @@ class PaymentRepositoryJpaTest {
 
     @Test
     void shouldSavePayment() {
-        Payment domain = createPayment(UUID.randomUUID(), UUID.randomUUID(), "CREDIT_CARD", PaymentStatus.PENDING);
+        Payment domain = createPayment(UUID.randomUUID(), "user-1", "CREDIT_CARD", PaymentStatus.PENDING);
         PaymentEntity entity = mapper.toEntity(domain);
 
         when(jpaRepository.save(any())).thenReturn(entity);
@@ -53,7 +53,7 @@ class PaymentRepositoryJpaTest {
     @Test
     void shouldFindById() {
         UUID paymentId = UUID.randomUUID();
-        PaymentEntity entity = createEntity(paymentId, UUID.randomUUID(), PaymentStatus.COMPLETED);
+        PaymentEntity entity = createEntity(paymentId, "user-1", PaymentStatus.COMPLETED);
 
         when(jpaRepository.findById(paymentId)).thenReturn(Optional.of(entity));
 
@@ -76,7 +76,7 @@ class PaymentRepositoryJpaTest {
 
     @Test
     void shouldFindByUserId() {
-        UUID userId = UUID.randomUUID();
+        String userId = "user-1";
         PaymentEntity e1 = createEntity(UUID.randomUUID(), userId, PaymentStatus.COMPLETED);
         PaymentEntity e2 = createEntity(UUID.randomUUID(), userId, PaymentStatus.PENDING);
 
@@ -91,7 +91,7 @@ class PaymentRepositoryJpaTest {
     @Test
     void shouldFindByOrderId() {
         UUID orderId = UUID.randomUUID();
-        PaymentEntity entity = createEntity(UUID.randomUUID(), UUID.randomUUID(), PaymentStatus.PENDING);
+        PaymentEntity entity = createEntity(UUID.randomUUID(), "user-1", PaymentStatus.PENDING);
         entity.setOrderId(orderId);
 
         when(jpaRepository.findByOrderId(orderId)).thenReturn(List.of(entity));
@@ -104,7 +104,7 @@ class PaymentRepositoryJpaTest {
 
     @Test
     void shouldDeletePayment() {
-        Payment domain = createPayment(UUID.randomUUID(), UUID.randomUUID(), "PIX", PaymentStatus.FAILED);
+        Payment domain = createPayment(UUID.randomUUID(), "user-1", "PIX", PaymentStatus.FAILED);
 
         doNothing().when(jpaRepository).deleteById(domain.getId());
 
@@ -114,7 +114,7 @@ class PaymentRepositoryJpaTest {
 
     @Test
     void shouldReturnEmptyListWhenNoPaymentsForUser() {
-        UUID userId = UUID.randomUUID();
+        String userId = "user-1";
         when(jpaRepository.findByUserId(userId)).thenReturn(List.of());
 
         List<Payment> result = repository.findByUserId(userId);
@@ -122,7 +122,7 @@ class PaymentRepositoryJpaTest {
         assertTrue(result.isEmpty());
     }
 
-    private Payment createPayment(UUID id, UUID userId, String method, PaymentStatus status) {
+    private Payment createPayment(UUID id, String userId, String method, PaymentStatus status) {
         return Payment.builder()
                 .id(id)
                 .userId(userId)
@@ -135,7 +135,7 @@ class PaymentRepositoryJpaTest {
                 .build();
     }
 
-    private PaymentEntity createEntity(UUID id, UUID userId, PaymentStatus status) {
+    private PaymentEntity createEntity(UUID id, String userId, PaymentStatus status) {
         return PaymentEntity.builder()
                 .id(id)
                 .userId(userId)

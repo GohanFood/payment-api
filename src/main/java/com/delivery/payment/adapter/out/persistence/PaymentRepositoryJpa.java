@@ -33,14 +33,14 @@ public class PaymentRepositoryJpa implements PaymentRepository {
     }
 
     @Override
-    public List<Payment> findByUserId(UUID userId) {
+    public List<Payment> findByUserId(String userId) {
         return jpaRepository.findByUserId(userId).stream()
                 .map(mapper::toDomain)
                 .toList();
     }
 
     @Override
-    public List<Payment> findByUserId(UUID userId, int page, int size) {
+    public List<Payment> findByUserId(String userId, int page, int size) {
         return jpaRepository.findByUserId(userId,
                         PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")))
                 .stream()
@@ -49,7 +49,7 @@ public class PaymentRepositoryJpa implements PaymentRepository {
     }
 
     @Override
-    public long countByUserId(UUID userId) {
+    public long countByUserId(String userId) {
         return jpaRepository.countByUserId(userId);
     }
 

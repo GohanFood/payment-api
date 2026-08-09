@@ -1,5 +1,6 @@
 package com.delivery.payment.advice;
 
+import com.delivery.payment.adapter.out.gateway.MercadoPagoIntegrationException;
 import com.delivery.payment.domain.payment.exception.GatewayUnavailableException;
 import com.delivery.payment.domain.payment.exception.InvalidPaymentAmountException;
 import com.delivery.payment.domain.payment.exception.PaymentAlreadyProcessedException;
@@ -34,6 +35,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(GatewayUnavailableException.class)
     public ResponseEntity<ErrorResponse> handleGatewayUnavailable(GatewayUnavailableException ex) {
+        return buildResponse(HttpStatus.BAD_GATEWAY, ex.getMessage());
+    }
+
+    @ExceptionHandler(MercadoPagoIntegrationException.class)
+    public ResponseEntity<ErrorResponse> handleMercadoPagoIntegration(MercadoPagoIntegrationException ex) {
+        log.error("Erro na integração com Mercado Pago: {}", ex.getMessage());
         return buildResponse(HttpStatus.BAD_GATEWAY, ex.getMessage());
     }
 

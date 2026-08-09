@@ -72,6 +72,7 @@ class PaymentControllerTest {
     private MercadoPagoWebhookValidator webhookValidator;
 
     private String jwtToken;
+    private static final String TEST_USER_ID = "user-123";
 
     @BeforeEach
     void setUp() {
@@ -79,7 +80,7 @@ class PaymentControllerTest {
 
         SecretKey key = Keys.hmacShaKeyFor("test-secret-key-for-testing-purposes-only".getBytes(StandardCharsets.UTF_8));
         jwtToken = Jwts.builder()
-                .subject("user-123")
+                .subject(TEST_USER_ID)
                 .claim("role", "USER")
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + 3600000))
@@ -90,14 +91,13 @@ class PaymentControllerTest {
     @Test
     void shouldCreatePayment() throws Exception {
         CreatePaymentRequest request = new CreatePaymentRequest();
-        request.setUserId(UUID.randomUUID());
         request.setOrderId(UUID.randomUUID());
         request.setAmount(new BigDecimal("150.00"));
         request.setPaymentMethod("CREDIT_CARD");
 
         Payment payment = Payment.builder()
                 .id(UUID.randomUUID())
-                .userId(request.getUserId())
+                .userId(TEST_USER_ID)
                 .orderId(request.getOrderId())
                 .amount(request.getAmount())
                 .paymentMethod(request.getPaymentMethod())
@@ -106,7 +106,7 @@ class PaymentControllerTest {
                 .updatedAt(LocalDateTime.now())
                 .build();
 
-        when(createPaymentUseCase.execute(any())).thenReturn(payment);
+        when(createPaymentUseCase.execute(any(CreatePaymentRequest.class), eq(TEST_USER_ID))).thenReturn(payment);
 
         mockMvc.perform(post("/api/v1/payments")
                         .header("Authorization", "Bearer " + jwtToken)
@@ -120,7 +120,6 @@ class PaymentControllerTest {
     @Test
     void shouldRejectUnauthorizedRequest() throws Exception {
         CreatePaymentRequest request = new CreatePaymentRequest();
-        request.setUserId(UUID.randomUUID());
         request.setOrderId(UUID.randomUUID());
         request.setAmount(new BigDecimal("100.00"));
         request.setPaymentMethod("PIX");
@@ -140,7 +139,7 @@ class PaymentControllerTest {
 
         Payment payment = Payment.builder()
                 .id(paymentId)
-                .userId(UUID.randomUUID())
+                .userId(TEST_USER_ID)
                 .orderId(UUID.randomUUID())
                 .amount(new BigDecimal("150.00"))
                 .paymentMethod("CREDIT_CARD")
@@ -166,7 +165,7 @@ class PaymentControllerTest {
         UUID paymentId = UUID.randomUUID();
         Payment payment = Payment.builder()
                 .id(paymentId)
-                .userId(UUID.randomUUID())
+                .userId(TEST_USER_ID)
                 .orderId(UUID.randomUUID())
                 .amount(new BigDecimal("200.00"))
                 .paymentMethod("PIX")
@@ -196,10 +195,9 @@ class PaymentControllerTest {
 
     @Test
     void shouldListPaymentsByUser() throws Exception {
-        UUID userId = UUID.randomUUID();
         Payment p1 = Payment.builder()
                 .id(UUID.randomUUID())
-                .userId(userId)
+                .userId(TEST_USER_ID)
                 .orderId(UUID.randomUUID())
                 .amount(new BigDecimal("100.00"))
                 .paymentMethod("CREDIT_CARD")
@@ -208,11 +206,10 @@ class PaymentControllerTest {
                 .updatedAt(LocalDateTime.now())
                 .build();
 
-        when(listPaymentsUseCase.execute(eq(userId), eq(0), eq(20))).thenReturn(List.of(p1));
+        when(listPaymentsUseCase.execute(eq(TEST_USER_ID), eq(0), eq(20))).thenReturn(List.of(p1));
 
         mockMvc.perform(get("/api/v1/payments")
-                        .header("Authorization", "Bearer " + jwtToken)
-                        .param("userId", userId.toString()))
+                        .header("Authorization", "Bearer " + jwtToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].status").value("COMPLETED"))
                 .andExpect(jsonPath("$[0].amount").value(100.00));
@@ -226,7 +223,7 @@ class PaymentControllerTest {
 
         Payment payment = Payment.builder()
                 .id(paymentId)
-                .userId(UUID.randomUUID())
+                .userId(TEST_USER_ID)
                 .orderId(UUID.randomUUID())
                 .amount(new BigDecimal("100.00"))
                 .paymentMethod("CREDIT_CARD")

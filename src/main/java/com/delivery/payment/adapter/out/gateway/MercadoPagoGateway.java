@@ -11,6 +11,8 @@ import com.mercadopago.client.payment.PaymentClient;
 import com.mercadopago.client.payment.PaymentCreateRequest;
 import com.mercadopago.client.payment.PaymentPayerRequest;
 import com.mercadopago.core.MPRequestOptions;
+import com.mercadopago.exceptions.MPApiException;
+import com.mercadopago.exceptions.MPException;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -179,6 +181,11 @@ public class MercadoPagoGateway
     public PaymentGatewayResponse processCardPayment(PaymentGatewayRequest request) {
         assertReady();
 
+        if (request.getPaymentMethodId() == null || request.getPaymentMethodId().isBlank()) {
+            throw new IllegalArgumentException(
+                    "paymentMethodId é obrigatório. Use a bandeira do cartão: visa, master, elo, amex, etc.");
+        }
+
         log.info("Processando pagamento via Mercado Pago Sandbox: amount={}, method={}, installments={}",
                 request.getTransactionAmount(), request.getPaymentMethodId(), request.getInstallments());
 
@@ -216,9 +223,10 @@ public class MercadoPagoGateway
                     .build();
 
         } catch (Exception e) {
-            log.error("Erro ao processar pagamento no Mercado Pago Sandbox", e);
-            throw new GatewayUnavailableException(
-                    "Falha na comunicação com o gateway de pagamento: " + e.getMessage(), e);
+            String mpErrorBody = extractMercadoPagoError(e);
+            log.error("Erro ao processar pagamento no Mercado Pago Sandbox: {}", mpErrorBody, e);
+            throw new MercadoPagoIntegrationException(
+                    "Falha ao processar pagamento no Mercado Pago: " + mpErrorBody, e);
         }
     }
 
@@ -288,7 +296,9 @@ public class MercadoPagoGateway
 
     private PaymentPayerRequest buildCardPayer(PaymentGatewayRequest request) {
         PaymentPayerRequest.PaymentPayerRequestBuilder builder = PaymentPayerRequest.builder()
-                .email(request.getPayerEmail());
+                .email(request.getPayerEmail())
+                .entityType("individual")
+                .type("customer");
 
         if (request.getIdentificationType() != null && request.getIdentificationNumber() != null) {
             builder.identification(
@@ -300,6 +310,25 @@ public class MercadoPagoGateway
         }
 
         return builder.build();
+    }
+
+    /**
+     * Extrai a mensagem de erro detalhada das exceções do Mercado Pago.
+     */
+    private String extractMercadoPagoError(Exception e) {
+        if (e instanceof MPApiException apiEx) {
+            try {
+                return apiEx.getApiResponse() != null
+                        ? apiEx.getApiResponse().getContent()
+                        : apiEx.getMessage();
+            } catch (Exception ex) {
+                return apiEx.getMessage();
+            }
+        }
+        if (e instanceof MPException mpEx) {
+            return mpEx.getMessage();
+        }
+        return e.getMessage() != null ? e.getMessage() : "Erro desconhecido";
     }
 
     /**

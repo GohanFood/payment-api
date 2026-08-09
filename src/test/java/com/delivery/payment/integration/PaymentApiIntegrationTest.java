@@ -65,11 +65,9 @@ class PaymentApiIntegrationTest {
 
     @Test
     void shouldCreateAndRetrievePayment() throws Exception {
-        UUID userId = UUID.randomUUID();
         UUID orderId = UUID.randomUUID();
 
         Map<String, Object> request = Map.of(
-                "userId", userId.toString(),
                 "orderId", orderId.toString(),
                 "amount", 150.00,
                 "paymentMethod", "CREDIT_CARD"
@@ -102,11 +100,9 @@ class PaymentApiIntegrationTest {
 
     @Test
     void shouldCreateAndProcessPayment() throws Exception {
-        UUID userId = UUID.randomUUID();
         UUID orderId = UUID.randomUUID();
 
         Map<String, Object> createRequest = Map.of(
-                "userId", userId.toString(),
                 "orderId", orderId.toString(),
                 "amount", 200.00,
                 "paymentMethod", "PIX"
@@ -145,12 +141,9 @@ class PaymentApiIntegrationTest {
 
     @Test
     void shouldListPaymentsByUser() throws Exception {
-        UUID userId = UUID.randomUUID();
-
-        // Create 2 payments for the same user
+        // Create 2 payments for the same user (userId from JWT)
         for (int i = 0; i < 2; i++) {
             Map<String, Object> request = Map.of(
-                    "userId", userId.toString(),
                     "orderId", UUID.randomUUID().toString(),
                     "amount", 100.00 + i,
                     "paymentMethod", "CREDIT_CARD"
@@ -163,8 +156,7 @@ class PaymentApiIntegrationTest {
         }
 
         mockMvc.perform(get("/api/v1/payments")
-                        .header("Authorization", "Bearer " + jwtToken)
-                        .param("userId", userId.toString()))
+                        .header("Authorization", "Bearer " + jwtToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray())
                 .andExpect(jsonPath("$.length()").value(2));
@@ -172,12 +164,10 @@ class PaymentApiIntegrationTest {
 
     @Test
     void shouldRefundPayment() throws Exception {
-        UUID userId = UUID.randomUUID();
         UUID orderId = UUID.randomUUID();
 
         // Create payment
         Map<String, Object> createRequest = Map.of(
-                "userId", userId.toString(),
                 "orderId", orderId.toString(),
                 "amount", 300.00,
                 "paymentMethod", "PIX"
@@ -241,7 +231,6 @@ class PaymentApiIntegrationTest {
     @Test
     void shouldRejectInvalidAmount() throws Exception {
         Map<String, Object> request = Map.of(
-                "userId", UUID.randomUUID().toString(),
                 "orderId", UUID.randomUUID().toString(),
                 "amount", 0,
                 "paymentMethod", "PIX"
@@ -257,7 +246,6 @@ class PaymentApiIntegrationTest {
     @Test
     void shouldRejectNegativeAmount() throws Exception {
         Map<String, Object> request = Map.of(
-                "userId", UUID.randomUUID().toString(),
                 "orderId", UUID.randomUUID().toString(),
                 "amount", -50.00,
                 "paymentMethod", "PIX"

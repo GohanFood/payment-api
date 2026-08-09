@@ -33,7 +33,7 @@ class ListPaymentsServiceTest {
 
     @Test
     void shouldReturnPaymentsForUser() {
-        UUID userId = UUID.randomUUID();
+        String userId = "user-1";
         Payment p1 = Payment.builder()
                 .id(UUID.randomUUID())
                 .userId(userId)
@@ -67,7 +67,7 @@ class ListPaymentsServiceTest {
 
     @Test
     void shouldReturnEmptyListWhenNoPayments() {
-        UUID userId = UUID.randomUUID();
+        String userId = "user-1";
         when(paymentRepository.findByUserId(eq(userId), eq(0), eq(20))).thenReturn(Collections.emptyList());
 
         List<Payment> result = service.execute(userId);
@@ -77,7 +77,7 @@ class ListPaymentsServiceTest {
 
     @Test
     void shouldReturnSinglePayment() {
-        UUID userId = UUID.randomUUID();
+        String userId = "user-1";
         Payment payment = Payment.builder()
                 .id(UUID.randomUUID())
                 .userId(userId)

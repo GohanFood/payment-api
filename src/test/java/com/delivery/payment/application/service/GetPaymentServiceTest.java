@@ -36,7 +36,7 @@ class GetPaymentServiceTest {
         UUID paymentId = UUID.randomUUID();
         Payment payment = Payment.builder()
                 .id(paymentId)
-                .userId(UUID.randomUUID())
+                .userId("user-1")
                 .orderId(UUID.randomUUID())
                 .amount(new BigDecimal("150.00"))
                 .paymentMethod("PIX")
@@ -68,7 +68,7 @@ class GetPaymentServiceTest {
         UUID paymentId = UUID.randomUUID();
         Payment payment = Payment.builder()
                 .id(paymentId)
-                .userId(UUID.randomUUID())
+                .userId("user-1")
                 .orderId(UUID.randomUUID())
                 .amount(new BigDecimal("50.00"))
                 .paymentMethod("CREDIT_CARD")

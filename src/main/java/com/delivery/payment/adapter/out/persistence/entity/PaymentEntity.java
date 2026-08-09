@@ -23,7 +23,7 @@ public class PaymentEntity {
     private UUID id;
 
     @Column(name = "user_id", nullable = false)
-    private UUID userId;
+    private String userId;
 
     @Column(name = "order_id", nullable = false)
     private UUID orderId;

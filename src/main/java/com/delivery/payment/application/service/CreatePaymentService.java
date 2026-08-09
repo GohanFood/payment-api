@@ -1,12 +1,15 @@
 package com.delivery.payment.application.service;
 
+import com.delivery.payment.application.dto.request.CreatePaymentRequest;
 import com.delivery.payment.application.dto.response.PixPaymentResponse;
 import com.delivery.payment.application.usecase.CreatePaymentUseCase;
 import com.delivery.payment.domain.payment.Payment;
 import com.delivery.payment.domain.payment.PaymentStatus;
 import com.delivery.payment.domain.payment.exception.GatewayUnavailableException;
 import com.delivery.payment.domain.payment.exception.InvalidPaymentAmountException;
-import com.delivery.payment.port.PaymentGatewayPort;
+import com.delivery.payment.domain.payment.gateway.PaymentGatewayPort;
+import com.delivery.payment.domain.payment.gateway.PaymentGatewayRequest;
+import com.delivery.payment.domain.payment.gateway.PaymentGatewayResponse;
 import com.delivery.payment.port.PaymentMessagingPort;
 import com.delivery.payment.port.PaymentRepository;
 import lombok.RequiredArgsConstructor;
@@ -25,69 +28,120 @@ public class CreatePaymentService implements CreatePaymentUseCase {
 
     private final PaymentRepository paymentRepository;
     private final PaymentMessagingPort paymentMessagingPort;
-    private final PaymentGatewayPort paymentGatewayPort;
+    private final com.delivery.payment.port.PaymentGatewayPort pixGateway;
+    private final PaymentGatewayPort cardGateway;
 
     @Override
     @Transactional
-    public Payment execute(Payment payment) {
-        if (payment.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new InvalidPaymentAmountException(payment.getAmount());
+    public Payment execute(CreatePaymentRequest request, String userId) {
+        if (request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new InvalidPaymentAmountException(request.getAmount());
         }
 
         Payment newPayment = Payment.builder()
                 .id(UUID.randomUUID())
-                .userId(payment.getUserId())
-                .orderId(payment.getOrderId())
-                .amount(payment.getAmount())
-                .paymentMethod(payment.getPaymentMethod())
+                .userId(userId)
+                .orderId(request.getOrderId())
+                .amount(request.getAmount())
+                .paymentMethod(request.getPaymentMethod())
                 .status(PaymentStatus.PENDING)
-                .payerEmail(payment.getPayerEmail())
-                .payerDocumentType(payment.getPayerDocumentType())
-                .payerDocumentNumber(payment.getPayerDocumentNumber())
+                .payerEmail(request.getPayerEmail())
+                .payerDocumentType(request.getPayerDocumentType())
+                .payerDocumentNumber(request.getPayerDocumentNumber())
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
 
         // Integração com Mercado Pago para PIX
         if (newPayment.isPix()) {
-            try {
-                String idempotencyKey = "IDEMP-" + newPayment.getId();
-
-                PixPaymentResponse mpResponse = paymentGatewayPort.createPixPayment(
-                        idempotencyKey,
-                        newPayment.getAmount(),
-                        "Pedido #" + newPayment.getOrderId(),
-                        newPayment.getPayerEmail(),
-                        payment.getPayerEmail(), // payerFirstName será usado o email como fallback
-                        "",
-                        newPayment.getPayerDocumentType(),
-                        newPayment.getPayerDocumentNumber()
-                );
-
-                newPayment.linkMercadoPago(
-                        mpResponse.getMpPaymentId(),
-                        mpResponse.getQrCode(),
-                        mpResponse.getQrCodeBase64(),
-                        mpResponse.getTicketUrl(),
-                        mpResponse.getDateOfExpiration() != null
-                                ? mpResponse.getDateOfExpiration().toLocalDateTime()
-                                : LocalDateTime.now().plusHours(24)
-                );
-
-                log.info("Pagamento PIX criado no MP: paymentId={}, mpPaymentId={}",
-                        newPayment.getId(), mpResponse.getMpPaymentId());
-            } catch (Exception e) {
-                log.error("Falha ao integrar com Mercado Pago para paymentId={}: {}",
-                        newPayment.getId(), e.getMessage(), e);
-                throw new GatewayUnavailableException(
-                        "Falha ao criar pagamento PIX no Mercado Pago: " + e.getMessage(), e);
-            }
+            processPixPayment(newPayment, request);
+        }
+        // Integração com Mercado Pago para Cartão (CREDIT_CARD, DEBIT_CARD)
+        else if (isCardPayment(request) && request.getGatewayToken() != null) {
+            processCardPayment(newPayment, request);
         }
 
         Payment saved = paymentRepository.save(newPayment);
-
         paymentMessagingPort.publishPaymentCreated(saved.getId(), saved.getOrderId());
-
         return saved;
+    }
+
+    private boolean isCardPayment(CreatePaymentRequest request) {
+        String method = request.getPaymentMethod();
+        return "CREDIT_CARD".equalsIgnoreCase(method) || "DEBIT_CARD".equalsIgnoreCase(method);
+    }
+
+    private void processPixPayment(Payment payment, CreatePaymentRequest request) {
+        try {
+            String idempotencyKey = "IDEMP-" + payment.getId();
+
+            PixPaymentResponse mpResponse = pixGateway.createPixPayment(
+                    idempotencyKey,
+                    payment.getAmount(),
+                    "Pedido #" + payment.getOrderId(),
+                    payment.getPayerEmail(),
+                    "",
+                    "",
+                    payment.getPayerDocumentType(),
+                    payment.getPayerDocumentNumber()
+            );
+
+            payment.linkMercadoPago(
+                    mpResponse.getMpPaymentId(),
+                    mpResponse.getQrCode(),
+                    mpResponse.getQrCodeBase64(),
+                    mpResponse.getTicketUrl(),
+                    mpResponse.getDateOfExpiration() != null
+                            ? mpResponse.getDateOfExpiration().toLocalDateTime()
+                            : LocalDateTime.now().plusHours(24)
+            );
+
+            log.info("Pagamento PIX criado no MP: paymentId={}, mpPaymentId={}",
+                    payment.getId(), mpResponse.getMpPaymentId());
+        } catch (Exception e) {
+            log.error("Falha ao integrar com Mercado Pago para paymentId={}: {}",
+                    payment.getId(), e.getMessage(), e);
+            throw new GatewayUnavailableException(
+                    "Falha ao criar pagamento PIX no Mercado Pago: " + e.getMessage(), e);
+        }
+    }
+
+    private void processCardPayment(Payment payment, CreatePaymentRequest request) {
+        try {
+            PaymentGatewayRequest gatewayRequest = PaymentGatewayRequest.builder()
+                    .cardToken(request.getGatewayToken())
+                    .transactionAmount(payment.getAmount())
+                    .installments(request.getInstallments() != null ? request.getInstallments() : 1)
+                    .paymentMethodId(request.getPaymentMethodId())
+                    .issuerId(request.getIssuerId())
+                    .description(request.getDescription() != null
+                            ? request.getDescription()
+                            : "Pedido " + payment.getOrderId())
+                    .payerEmail(request.getPayerEmail())
+                    .identificationType(request.getPayerDocumentType())
+                    .identificationNumber(request.getPayerDocumentNumber())
+                    .idempotencyKey(payment.getId().toString())
+                    .build();
+
+            PaymentGatewayResponse gatewayResponse = cardGateway.processCardPayment(gatewayRequest);
+
+            if (gatewayResponse.isApproved()) {
+                payment.markAsCompleted(gatewayResponse.getExternalId());
+                log.info("Pagamento via cartão aprovado: paymentId={}, mpPaymentId={}",
+                        payment.getId(), gatewayResponse.getExternalId());
+            } else if (gatewayResponse.isRejected()) {
+                payment.markAsFailed();
+                log.warn("Pagamento via cartão rejeitado: paymentId={}, statusDetail={}",
+                        payment.getId(), gatewayResponse.getExternalStatusDetail());
+            } else {
+                log.info("Pagamento via cartão pendente no gateway: paymentId={}, mpPaymentId={}, mpStatus={}",
+                        payment.getId(), gatewayResponse.getExternalId(), gatewayResponse.getExternalStatus());
+            }
+        } catch (Exception e) {
+            log.error("Falha ao processar cartão no Mercado Pago para paymentId={}: {}",
+                    payment.getId(), e.getMessage(), e);
+            throw new GatewayUnavailableException(
+                    "Falha ao processar pagamento com cartão no Mercado Pago: " + e.getMessage(), e);
+        }
     }
 }

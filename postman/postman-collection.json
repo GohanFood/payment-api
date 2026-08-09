@@ -1,13 +1,14 @@
 {
 	"info": {
-		"_postman_id": "payment-api-v4-collection",
+		"_postman_id": "payment-api-v5-collection",
 		"name": "Payment API - Mercado Pago Sandbox",
-		"description": "Collection para a Payment API do sistema Delivery com integração Mercado Pago Sandbox.\n\n**Base URL:** http://localhost:8082/api/v1\n**Auth:** Bearer JWT\n\n## Credenciais necessárias:\n- `jwt_token` = seu token JWT Bearer\n- `MERCADOPAGO_ACCESS_TOKEN` = token sandbox (TEST-...) configurado no application-dev.yml\n\n## Métodos de pagamento:\n- PIX: QR Code gerado via Mercado Pago Sandbox\n- CREDIT_CARD: processado via MercadoPago.js CardForm → CardToken\n- DEBIT_CARD, BOLETO: criados como PENDING",
+		"description": "Collection para a Payment API do sistema Delivery com integração Mercado Pago Sandbox.\n\n**Base URL:** http://localhost:8082/api/v1\n**Auth:** Bearer JWT (userId extraído automaticamente do token)\n\n## Credenciais necessárias:\n- `jwt_token` = seu token JWT Bearer (gerado pelo user-api)\n- `card_token` = CardToken gerado via MercadoPago.js ou API de card_tokens (sandbox)\n\n## Fluxos de pagamento:\n- **PIX**: POST /payments → MP Sandbox → retorna QR Code (status PENDING)\n- **Cartão**: POST /payments com gatewayToken → MP Sandbox direto → retorna COMPLETED/FAILED\n- **Cartão (sem token)**: POST /payments sem gatewayToken → apenas PENDING local\n- **Reprocessar**: POST /{id}/process → fallback para reenviar ao MP",
+
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [
 		{
-			"name": "Payments",
+			"name": "1. PIX",
 			"item": [
 				{
 					"name": "Criar Pagamento PIX",
@@ -20,11 +21,14 @@
 									"    pm.response.to.have.status(201);",
 									"});",
 									"",
-									"pm.test(\"Response contém QR Code\", function () {",
+									"pm.test(\"Response contém QR Code e mpPaymentId\", function () {",
 									"    var jsonData = pm.response.json();",
 									"    pm.expect(jsonData.id).to.not.be.null;",
 									"    pm.expect(jsonData.status).to.eql(\"PENDING\");",
+									"    pm.expect(jsonData.qrCode).to.not.be.null;",
+									"    pm.expect(jsonData.mpPaymentId).to.not.be.null;",
 									"    pm.collectionVariables.set(\"payment_id\", jsonData.id);",
+									"    pm.collectionVariables.set(\"mp_payment_id\", jsonData.mpPaymentId);",
 									"});"
 								],
 								"type": "text/javascript"
@@ -39,19 +43,24 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"userId\": \"550e8400-e29b-41d4-a716-446655440001\",\n  \"orderId\": \"660e8400-e29b-41d4-a716-446655440002\",\n  \"amount\": 150.00,\n  \"paymentMethod\": \"PIX\",\n  \"payerEmail\": \"cliente@email.com\",\n  \"payerFirstName\": \"Joao\",\n  \"payerLastName\": \"Silva\",\n  \"payerDocumentType\": \"CPF\",\n  \"payerDocumentNumber\": \"19119119100\"\n}"
+							"raw": "{\n  \"orderId\": \"660e8400-e29b-41d4-a716-446655440002\",\n  \"amount\": 150.00,\n  \"paymentMethod\": \"PIX\",\n  \"payerEmail\": \"test_user_123@testuser.com\",\n  \"payerDocumentType\": \"CPF\",\n  \"payerDocumentNumber\": \"19119119100\"\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/api/v1/payments",
 							"host": ["{{base_url}}"],
 							"path": ["api", "v1", "payments"]
 						},
-						"description": "Cria um pagamento PIX via Mercado Pago Sandbox.\n\n**paymentMethod=PIX** chama a API do Mercado Pago e retorna QR Code, ticket_url e dados do pagamento.\n\npayerDocumentType: CPF | CNPJ\namount: deve ser > 0\n\nRequer MERCADOPAGO_ACCESS_TOKEN configurado no application-dev.yml (token sandbox TEST-...)."
+						"description": "Cria um pagamento PIX via Mercado Pago Sandbox.\n\nO userId é extraído automaticamente do token JWT (campo id ou sub).\n\n**paymentMethod=PIX** chama a API do Mercado Pago e retorna:\n- qrCode: código PIX copia-e-cola\n- qrCodeBase64: imagem do QR Code\n- ticketUrl: link para página de pagamento\n- mpPaymentId: ID do pagamento no Mercado Pago\n\n## Campos obrigatórios:\n- orderId, amount, paymentMethod\n\n## Campos recomendados:\n- payerEmail: email do comprador\n- payerDocumentType: CPF ou CNPJ\n- payerDocumentNumber: número do documento\n\namount: deve ser > 0\n\n**Requer MERCADOPAGO_ACCESS_TOKEN configurado.**"
 					},
 					"response": []
-				},
+				}
+			]
+		},
+		{
+			"name": "2. Cartão de Crédito/Débito",
+			"item": [
 				{
-					"name": "Criar Pagamento (Cartão)",
+					"name": "Criar Pagamento Cartão (MP direto)",
 					"event": [
 						{
 							"listen": "test",
@@ -60,7 +69,17 @@
 									"pm.test(\"Status 201 Created\", function () {",
 									"    pm.response.to.have.status(201);",
 									"});",
-									"pm.collectionVariables.set(\"payment_id\", pm.response.json().id);"
+									"",
+									"var json = pm.response.json();",
+									"pm.collectionVariables.set(\"payment_id\", json.id);",
+									"",
+									"pm.test(\"Pagamento processado no MP\", function () {",
+									"    pm.expect(json.status).to.be.oneOf([\"COMPLETED\", \"FAILED\", \"PENDING\"]);",
+									"    if (json.status === \"COMPLETED\") {",
+									"        pm.expect(json.gatewayTransactionId).to.not.be.null;",
+									"        pm.collectionVariables.set(\"gateway_transaction_id\", json.gatewayTransactionId);",
+									"    }",
+									"});"
 								],
 								"type": "text/javascript"
 							}
@@ -74,26 +93,66 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"userId\": \"550e8400-e29b-41d4-a716-446655440001\",\n  \"orderId\": \"660e8400-e29b-41d4-a716-446655440003\",\n  \"amount\": 89.90,\n  \"paymentMethod\": \"CREDIT_CARD\"\n}"
+							"raw": "{\n  \"orderId\": \"660e8400-e29b-41d4-a716-446655440100\",\n  \"amount\": 89.90,\n  \"paymentMethod\": \"CREDIT_CARD\",\n  \"payerEmail\": \"cliente@email.com\",\n  \"payerDocumentType\": \"CPF\",\n  \"payerDocumentNumber\": \"19119119100\",\n  \"gatewayToken\": \"{{card_token}}\",\n  \"paymentMethodId\": \"master\",\n  \"installments\": 1,\n  \"description\": \"Pedido de teste\"\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/api/v1/payments",
 							"host": ["{{base_url}}"],
 							"path": ["api", "v1", "payments"]
 						},
-						"description": "Cria pagamento com cartão (ou outros métodos). Não chama o Mercado Pago — apenas cria PENDING local."
+						"description": "Cria e processa pagamento com cartão via Mercado Pago Sandbox em uma única chamada.\n\nO userId é extraído automaticamente do token JWT.\n\n## Campos obrigatórios para cartão:\n- **gatewayToken**: CardToken gerado pelo MercadoPago.js ou API /v1/card_tokens\n- **paymentMethodId**: bandeira do cartão (visa, master, elo, amex, etc.)\n- **payerEmail**: email do comprador\n- **installments**: número de parcelas (default 1)\n\n## Campos recomendados:\n- **payerDocumentType**: CPF ou CNPJ\n- **payerDocumentNumber**: número do documento\n- **description**: descrição do pedido\n\n## Cartões de teste (sandbox):\n- Mastercard APRO: 5031433215406351 (sempre aprova)\n- Visa APRO: 4235647728025682 (sempre aprova)\n- Visa REJEITADO: 4002763673272116 (fundos insuficientes)\n\n## Status de resposta:\n- COMPLETED: pagamento aprovado\n- FAILED: pagamento rejeitado\n- PENDING: aguardando processamento\n\n**Requer MERCADOPAGO_ACCESS_TOKEN configurado.**"
 					},
 					"response": []
 				},
 				{
-					"name": "Processar Pagamento (Cartão via Mercado Pago)",
+					"name": "Criar Pagamento Cartão (sem token - PENDING local)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Status 201 Created\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"pm.test(\"Status PENDING (não processado no MP)\", function () {",
+									"    var json = pm.response.json();",
+									"    pm.expect(json.status).to.eql(\"PENDING\");",
+									"    pm.expect(json.gatewayTransactionId).to.be.null;",
+									"    pm.collectionVariables.set(\"payment_id_pending\", json.id);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"orderId\": \"660e8400-e29b-41d4-a716-446655440101\",\n  \"amount\": 50.00,\n  \"paymentMethod\": \"DEBIT_CARD\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/payments",
+							"host": ["{{base_url}}"],
+							"path": ["api", "v1", "payments"]
+						},
+						"description": "Cria pagamento com cartão (sem gatewayToken).\n\n**NÃO chama o Mercado Pago** — apenas cria o registro PENDING local.\n\nUse o endpoint \"Reprocessar Pagamento\" para enviar ao MP posteriormente com o CardToken."
+					},
+					"response": []
+				},
+				{
+					"name": "Reprocessar Pagamento (fallback)",
 					"event": [
 						{
 							"listen": "prerequest",
 							"script": {
 								"exec": [
-									"if (!pm.collectionVariables.get(\"payment_id\")) {",
-									"    pm.collectionVariables.set(\"payment_id\", \"770e8400-e29b-41d4-a716-446655440003\");",
+									"if (!pm.collectionVariables.get(\"payment_id_pending\")) {",
+									"    pm.collectionVariables.set(\"payment_id_pending\", pm.collectionVariables.get(\"payment_id\"));",
 									"}"
 								],
 								"type": "text/javascript"
@@ -124,17 +183,22 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"gatewayToken\": \"CARD_TOKEN_DO_MERCADOPAGO_JS\",\n  \"payerEmail\": \"cliente@email.com\",\n  \"installments\": 1,\n  \"paymentMethodId\": \"visa\",\n  \"issuerId\": \"0\",\n  \"identificationType\": \"CPF\",\n  \"identificationNumber\": \"19119119100\",\n  \"description\": \"Pedido #123\"\n}"
+							"raw": "{\n  \"gatewayToken\": \"{{card_token}}\",\n  \"payerEmail\": \"cliente@email.com\",\n  \"installments\": 1,\n  \"paymentMethodId\": \"master\",\n  \"identificationType\": \"CPF\",\n  \"identificationNumber\": \"19119119100\",\n  \"description\": \"Reprocessamento do pedido\"\n}"
 						},
 						"url": {
-							"raw": "{{base_url}}/api/v1/payments/{{payment_id}}/process",
+							"raw": "{{base_url}}/api/v1/payments/{{payment_id_pending}}/process",
 							"host": ["{{base_url}}"],
-							"path": ["api", "v1", "payments", "{{payment_id}}", "process"]
+							"path": ["api", "v1", "payments", "{{payment_id_pending}}", "process"]
 						},
-						"description": "Processa pagamento via Mercado Pago Sandbox.\n\ngatewayToken (obrigatório): CardToken gerado pelo MercadoPago.js no frontend.\npayerEmail (obrigatório): email do comprador.\ninstallments (default 1): número de parcelas.\npaymentMethodId: bandeira do cartão (visa, master, elo, amex).\nidentificationType/Number: documento do comprador (recomendado).\n\nStatus de resposta:\n- COMPLETED: pagamento aprovado\n- FAILED: pagamento rejeitado\n- PENDING: aguardando processamento (webhook atualizará)\n\nRequer MERCADOPAGO_ACCESS_TOKEN configurado."
+						"description": "Reprocessa/envia um pagamento PENDING para o Mercado Pago Sandbox.\n\nUsado como fallback quando o pagamento foi criado sem CardToken.\n\n**gatewayToken** (obrigatório): CardToken gerado pelo MercadoPago.js ou API /v1/card_tokens.\n**payerEmail** (obrigatório): email do comprador.\n**paymentMethodId** (obrigatório): bandeira do cartão.\n**installments** (default 1): número de parcelas.\n\nStatus de resposta:\n- COMPLETED: pagamento aprovado\n- FAILED: pagamento rejeitado\n- PENDING: aguardando processamento\n\n**409 Conflict** se o pagamento já foi processado."
 					},
 					"response": []
-				},
+				}
+			]
+		},
+		{
+			"name": "3. Consultas",
+			"item": [
 				{
 					"name": "Buscar Pagamento por ID",
 					"event": [
@@ -171,12 +235,12 @@
 							"host": ["{{base_url}}"],
 							"path": ["api", "v1", "payments", "{{payment_id}}"]
 						},
-						"description": "Busca pagamento por ID. Retorna QR Code e dados do MP se for PIX."
+						"description": "Busca pagamento por ID.\n\nRetorna QR Code e dados do MP se for PIX.\nRetorna gatewayTransactionId e status se for cartão."
 					},
 					"response": []
 				},
 				{
-					"name": "Listar Pagamentos por Usuário",
+					"name": "Listar Pagamentos do Usuário",
 					"event": [
 						{
 							"listen": "test",
@@ -184,6 +248,9 @@
 								"exec": [
 									"pm.test(\"Status 200 OK\", function () {",
 									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Retorna array\", function () {",
+									"    pm.expect(pm.response.json()).to.be.an('array');",
 									"});"
 								],
 								"type": "text/javascript"
@@ -196,17 +263,23 @@
 							{ "key": "Authorization", "value": "Bearer {{jwt_token}}" }
 						],
 						"url": {
-							"raw": "{{base_url}}/api/v1/payments?userId=550e8400-e29b-41d4-a716-446655440001",
+							"raw": "{{base_url}}/api/v1/payments?page=0&size=20",
 							"host": ["{{base_url}}"],
 							"path": ["api", "v1", "payments"],
 							"query": [
-								{ "key": "userId", "value": "550e8400-e29b-41d4-a716-446655440001" }
+								{ "key": "page", "value": "0" },
+								{ "key": "size", "value": "20" }
 							]
 						},
-						"description": "Lista todos os pagamentos de um usuário."
+						"description": "Lista todos os pagamentos do usuário autenticado.\n\n**O userId é extraído automaticamente do token JWT** — não precisa enviar como query param.\n\nParâmetros opcionais:\n- page: número da página (0-based, default 0)\n- size: itens por página (default 20, max 100)"
 					},
 					"response": []
-				},
+				}
+			]
+		},
+		{
+			"name": "4. Reembolso",
+			"item": [
 				{
 					"name": "Reembolsar Pagamento",
 					"event": [
@@ -227,6 +300,9 @@
 								"exec": [
 									"pm.test(\"Status 200 OK\", function () {",
 									"    pm.response.to.have.status(200);",
+									"});",
+									"pm.test(\"Status REFUNDED\", function () {",
+									"    pm.expect(pm.response.json().status).to.eql(\"REFUNDED\");",
 									"});"
 								],
 								"type": "text/javascript"
@@ -248,14 +324,14 @@
 							"host": ["{{base_url}}"],
 							"path": ["api", "v1", "payments", "refund"]
 						},
-						"description": "Reembolsa um pagamento concluído."
+						"description": "Reembolsa um pagamento concluído (COMPLETED) tanto no nosso sistema quanto no Mercado Pago.\n\n**409 Conflict** se o pagamento já foi reembolsado ou não está COMPLETED."
 					},
 					"response": []
 				}
 			]
 		},
 		{
-			"name": "Webhooks",
+			"name": "5. Webhooks",
 			"item": [
 				{
 					"name": "Simular Webhook MP (pagamento aprovado)",
@@ -281,21 +357,21 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"action\": \"payment.updated\",\n  \"data\": { \"id\": \"123456789\" },\n  \"type\": \"payment\"\n}"
+							"raw": "{\n  \"action\": \"payment.updated\",\n  \"data\": { \"id\": \"{{mp_payment_id}}\" },\n  \"type\": \"payment\"\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/api/v1/payments/webhook",
 							"host": ["{{base_url}}"],
 							"path": ["api", "v1", "payments", "webhook"]
 						},
-						"description": "Simula uma notificação de webhook do Mercado Pago.\n\nHeaders:\n- x-signature: assinatura HMAC-SHA256 (validada apenas se webhook-secret estiver configurado)\n- x-request-id: ID único da requisição\n\nImportante: O data.id deve corresponder ao mpPaymentId de um pagamento PIX existente no banco.\n\nEste endpoint é público (não requer JWT)."
+						"description": "Simula uma notificação de webhook do Mercado Pago.\n\nHeaders:\n- x-signature: assinatura HMAC-SHA256 (validada apenas se webhook-secret estiver configurado)\n- x-request-id: ID único da requisição\n\nImportante: O data.id deve corresponder ao mpPaymentId de um pagamento existente no banco.\nUse {{mp_payment_id}} (preenchido automaticamente ao criar um PIX).\n\nEste endpoint é público (não requer JWT)."
 					},
 					"response": []
 				}
 			]
 		},
 		{
-			"name": "Health",
+			"name": "6. Health",
 			"item": [
 				{
 					"name": "Health Check",
@@ -304,7 +380,10 @@
 							"listen": "test",
 							"script": {
 								"exec": [
-									"pm.test(\"Status 200 OK\", function () { pm.response.to.have.status(200); });"
+									"pm.test(\"Status 200 OK\", function () { pm.response.to.have.status(200); });",
+									"pm.test(\"Status UP\", function () {",
+									"    pm.expect(pm.response.json().status).to.eql(\"UP\");",
+									"});"
 								],
 								"type": "text/javascript"
 							}
@@ -318,7 +397,7 @@
 							"host": ["{{base_url}}"],
 							"path": ["actuator", "health"]
 						},
-						"description": "Health check público."
+						"description": "Health check público (não requer JWT)."
 					},
 					"response": []
 				}
@@ -338,6 +417,26 @@
 		},
 		{
 			"key": "payment_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "payment_id_pending",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "mp_payment_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "card_token",
+			"value": "8cdd0070406330b83da710c3dcf5c816",
+			"type": "string"
+		},
+		{
+			"key": "gateway_transaction_id",
 			"value": "",
 			"type": "string"
 		}

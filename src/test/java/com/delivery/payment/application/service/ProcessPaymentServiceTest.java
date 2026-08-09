@@ -57,7 +57,7 @@ class ProcessPaymentServiceTest {
         UUID orderId = UUID.randomUUID();
         Payment pending = Payment.builder()
                 .id(paymentId)
-                .userId(UUID.randomUUID())
+                .userId("user-1")
                 .orderId(orderId)
                 .amount(new BigDecimal("100.00"))
                 .paymentMethod("CREDIT_CARD")
@@ -99,7 +99,7 @@ class ProcessPaymentServiceTest {
         UUID paymentId = UUID.randomUUID();
         Payment completed = Payment.builder()
                 .id(paymentId)
-                .userId(UUID.randomUUID())
+                .userId("user-1")
                 .orderId(UUID.randomUUID())
                 .amount(new BigDecimal("100.00"))
                 .paymentMethod("CREDIT_CARD")
@@ -120,7 +120,7 @@ class ProcessPaymentServiceTest {
         UUID paymentId = UUID.randomUUID();
         Payment failed = Payment.builder()
                 .id(paymentId)
-                .userId(UUID.randomUUID())
+                .userId("user-1")
                 .orderId(UUID.randomUUID())
                 .amount(new BigDecimal("100.00"))
                 .paymentMethod("CREDIT_CARD")
@@ -140,7 +140,7 @@ class ProcessPaymentServiceTest {
         UUID paymentId = UUID.randomUUID();
         Payment refunded = Payment.builder()
                 .id(paymentId)
-                .userId(UUID.randomUUID())
+                .userId("user-1")
                 .orderId(UUID.randomUUID())
                 .amount(new BigDecimal("100.00"))
                 .paymentMethod("CREDIT_CARD")

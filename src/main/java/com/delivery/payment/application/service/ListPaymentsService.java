@@ -7,7 +7,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -19,18 +18,18 @@ public class ListPaymentsService implements ListPaymentsUseCase {
     private final PaymentRepository paymentRepository;
 
     @Override
-    public List<Payment> execute(UUID userId) {
+    public List<Payment> execute(String userId) {
         return execute(userId, 0, DEFAULT_PAGE_SIZE);
     }
 
     @Override
-    public List<Payment> execute(UUID userId, int page, int size) {
+    public List<Payment> execute(String userId, int page, int size) {
         int safeSize = Math.min(size, MAX_PAGE_SIZE);
         return paymentRepository.findByUserId(userId, page, safeSize);
     }
 
     @Override
-    public long countByUserId(UUID userId) {
+    public long countByUserId(String userId) {
         return paymentRepository.countByUserId(userId);
     }
 }

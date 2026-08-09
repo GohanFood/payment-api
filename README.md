@@ -114,11 +114,16 @@ Sem `MERCADOPAGO_ACCESS_TOKEN`, o gateway opera em **modo simulado** (fallback a
 ### Datasets de teste do Mercado Pago (sandbox)
 
 Use estes cartões no ambiente de testes do Mercado Pago:
-| Cartão | Número | CVV | Vencimento |
-|--------|--------|-----|------------|
-| Aprovado | 5031 4332 1540 6351 | 123 | 11/25 |
-| Recusado | 5031 4332 1540 6351 | 123 | 11/25 (valor > aprovação) |
-| Pendente | 5031 4332 1540 6351 | 123 | 11/25 |
+
+| Cartão | Número | Bandeira | Comportamento |
+|--------|--------|----------|---------------|
+| Aprovado | 5031 4332 1540 6351 | Mastercard | Sempre aprova |
+| Aprovado | 4235 6477 2802 5682 | Visa | Sempre aprova |
+| Recusado | 4002 7636 7327 2116 | Visa | Fundos insuficientes |
+
+**CVV:** `123` | **Vencimento:** `12/2030` | **Nome:** `APRO`
+
+> ⚠️ Para gerar um `CardToken` use o endpoint `POST https://api.mercadopago.com/v1/card_tokens?public_key=<PUBLIC_KEY>` ou o MercadoPago.js no frontend.
 
 ---
 
@@ -129,8 +134,9 @@ Use estes cartões no ambiente de testes do Mercado Pago:
 | Método | Descrição |
 |--------|-----------|
 | **PIX** | QR Code gerado via `POST /v1/payments` com `paymentMethod: "PIX"` |
-| **Cartão** | CardToken via MercadoPago.js CardForm → `POST /v1/payments/{id}/process` |
-| **Reembolso** | Via `POST /v1/payments/refund` ou `POST /v1/payments/webhook` (IPN) |
+| **Cartão** | CardToken → `POST /v1/payments` com `gatewayToken` processa direto no MP |
+| **Reprocessar** | `POST /v1/payments/{id}/process` para reenviar pagamento PENDING |
+| **Reembolso** | Via `POST /v1/payments/refund` ou webhook (IPN) |
 
 ### Apache Kafka
 
@@ -148,12 +154,45 @@ Use estes cartões no ambiente de testes do Mercado Pago:
 
 | Método | Rota | Descrição | Auth |
 |--------|------|-----------|------|
-| POST | `/api/v1/payments` | Criar pagamento (PIX gera QR Code) | JWT |
-| POST | `/api/v1/payments/{id}/process` | Processar via cartão (Mercado Pago) | JWT |
+| POST | `/api/v1/payments` | Criar pagamento (PIX gera QR Code; Cartão com gatewayToken processa direto no MP) | JWT |
+| POST | `/api/v1/payments/{id}/process` | Reprocessar pagamento PENDING via Mercado Pago (fallback) | JWT |
 | GET | `/api/v1/payments/{id}` | Buscar pagamento por ID | JWT |
-| GET | `/api/v1/payments?userId=` | Listar pagamentos do usuário | JWT |
+| GET | `/api/v1/payments` | Listar pagamentos do usuário autenticado | JWT |
 | POST | `/api/v1/payments/refund` | Reembolsar pagamento | JWT |
 | POST | `/api/v1/payments/webhook` | Webhook IPN Mercado Pago | — |
+
+> **Nota:** O `userId` é extraído automaticamente do token JWT (campo `sub` ou `id`). Não é necessário enviar no body ou query params.
+
+### Exemplos de requisição
+
+**PIX:**
+```json
+POST /api/v1/payments
+{
+  "orderId": "660e8400-e29b-41d4-a716-446655440002",
+  "amount": 150.00,
+  "paymentMethod": "PIX",
+  "payerEmail": "test_user_123@testuser.com",
+  "payerDocumentType": "CPF",
+  "payerDocumentNumber": "19119119100"
+}
+```
+
+**Cartão (MP direto):**
+```json
+POST /api/v1/payments
+{
+  "orderId": "660e8400-e29b-41d4-a716-446655440100",
+  "amount": 89.90,
+  "paymentMethod": "CREDIT_CARD",
+  "payerEmail": "test_user_123@testuser.com",
+  "payerDocumentType": "CPF",
+  "payerDocumentNumber": "19119119100",
+  "gatewayToken": "<card_token>",
+  "paymentMethodId": "master",
+  "installments": 1
+}
+```
 
 ---
 

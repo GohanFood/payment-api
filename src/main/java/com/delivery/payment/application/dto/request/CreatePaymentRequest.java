@@ -17,9 +17,6 @@ import java.util.UUID;
 public class CreatePaymentRequest {
 
     @NotNull
-    private UUID userId;
-
-    @NotNull
     private UUID orderId;
 
     @NotNull
@@ -32,8 +29,24 @@ public class CreatePaymentRequest {
     // --- Dados do pagador (obrigatórios para PIX via Mercado Pago) ---
 
     private String payerEmail;
-    private String payerFirstName;
-    private String payerLastName;
     private String payerDocumentType;
     private String payerDocumentNumber;
+
+    // --- Dados do cartão (obrigatórios para CREDIT_CARD/DEBIT_CARD via Mercado Pago) ---
+
+    /** CardToken gerado pelo MercadoPago.js CardForm */
+    private String gatewayToken;
+
+    /** Número de parcelas (default: 1) */
+    @Builder.Default
+    private Integer installments = 1;
+
+    /** Bandeira do cartão (ex: visa, master, elo, amex) */
+    private String paymentMethodId;
+
+    /** ID do banco emissor (opcional — o MP extrai do CardToken) */
+    private String issuerId;
+
+    /** Descrição do pagamento */
+    private String description;
 }

@@ -24,13 +24,13 @@ class PaymentEntityMapperTest {
     @Test
     void shouldMapDomainToEntity() {
         UUID id = UUID.randomUUID();
-        UUID userId = UUID.randomUUID();
+        String userId = "user-1";
         UUID orderId = UUID.randomUUID();
         LocalDateTime now = LocalDateTime.now();
 
         Payment domain = Payment.builder()
                 .id(id)
-                .userId(userId)
+                .userId("user-1")
                 .orderId(orderId)
                 .amount(new BigDecimal("150.00"))
                 .paymentMethod("CREDIT_CARD")
@@ -44,7 +44,7 @@ class PaymentEntityMapperTest {
 
         assertNotNull(entity);
         assertEquals(id, entity.getId());
-        assertEquals(userId, entity.getUserId());
+        assertEquals("user-1", entity.getUserId());
         assertEquals(orderId, entity.getOrderId());
         assertEquals(new BigDecimal("150.00"), entity.getAmount());
         assertEquals("CREDIT_CARD", entity.getPaymentMethod());
@@ -60,7 +60,7 @@ class PaymentEntityMapperTest {
 
         PaymentEntity entity = PaymentEntity.builder()
                 .id(id)
-                .userId(UUID.randomUUID())
+                .userId("user-1")
                 .orderId(UUID.randomUUID())
                 .amount(new BigDecimal("200.00"))
                 .paymentMethod("PIX")
@@ -84,7 +84,7 @@ class PaymentEntityMapperTest {
     void shouldHandleNullGatewayTransactionId() {
         PaymentEntity entity = PaymentEntity.builder()
                 .id(UUID.randomUUID())
-                .userId(UUID.randomUUID())
+                .userId("user-1")
                 .orderId(UUID.randomUUID())
                 .amount(new BigDecimal("50.00"))
                 .paymentMethod("DEBIT_CARD")
@@ -101,13 +101,13 @@ class PaymentEntityMapperTest {
     @Test
     void shouldRoundTripCorrectly() {
         UUID id = UUID.randomUUID();
-        UUID userId = UUID.randomUUID();
+        String userId = "user-1";
         UUID orderId = UUID.randomUUID();
         LocalDateTime now = LocalDateTime.now();
 
         Payment original = Payment.builder()
                 .id(id)
-                .userId(userId)
+                .userId("user-1")
                 .orderId(orderId)
                 .amount(new BigDecimal("99.99"))
                 .paymentMethod("CREDIT_CARD")
@@ -134,7 +134,7 @@ class PaymentEntityMapperTest {
         for (PaymentStatus status : PaymentStatus.values()) {
             PaymentEntity entity = PaymentEntity.builder()
                     .id(UUID.randomUUID())
-                    .userId(UUID.randomUUID())
+                    .userId("user-1")
                     .orderId(UUID.randomUUID())
                     .amount(new BigDecimal("100.00"))
                     .paymentMethod("CREDIT_CARD")

@@ -12,7 +12,7 @@ public interface PaymentRepository {
 
     Optional<Payment> findById(UUID id);
 
-    List<Payment> findByUserId(UUID userId);
+    List<Payment> findByUserId(String userId);
 
     /**
      * Busca paginada de pagamentos por usuário.
@@ -21,12 +21,12 @@ public interface PaymentRepository {
      * @param size tamanho da página
      * @return lista de pagamentos da página solicitada
      */
-    List<Payment> findByUserId(UUID userId, int page, int size);
+    List<Payment> findByUserId(String userId, int page, int size);
 
     /**
      * Conta total de pagamentos de um usuário (útil para paginação).
      */
-    long countByUserId(UUID userId);
+    long countByUserId(String userId);
 
     List<Payment> findByOrderId(UUID orderId);
 

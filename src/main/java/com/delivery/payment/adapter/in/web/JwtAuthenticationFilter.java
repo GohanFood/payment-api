@@ -53,6 +53,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     .getPayload();
 
             String subject = claims.getSubject();
+
+            // Compatibilidade com token da user-api que usa claim "id" em vez de "sub"
+            if (subject == null) {
+                Object idClaim = claims.get("id");
+                subject = idClaim != null ? idClaim.toString() : null;
+            }
+
             String role = claims.get("role", String.class);
 
             List<SimpleGrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_" + role));

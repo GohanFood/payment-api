@@ -13,7 +13,7 @@ class PaymentTest {
     @Test
     void shouldCreatePaymentWithAllFields() {
         UUID id = UUID.randomUUID();
-        UUID userId = UUID.randomUUID();
+        String userId = "user-1";
         UUID orderId = UUID.randomUUID();
         LocalDateTime now = LocalDateTime.now();
 
@@ -71,7 +71,7 @@ class PaymentTest {
     void shouldHandleAllStatusTransitions() {
         Payment payment = Payment.builder()
                 .id(UUID.randomUUID())
-                .userId(UUID.randomUUID())
+                .userId("user-1")
                 .orderId(UUID.randomUUID())
                 .amount(new BigDecimal("50.00"))
                 .paymentMethod("PIX")
@@ -93,7 +93,7 @@ class PaymentTest {
     void shouldHandleFailureThenRefundTransition() {
         Payment payment = Payment.builder()
                 .id(UUID.randomUUID())
-                .userId(UUID.randomUUID())
+                .userId("user-1")
                 .orderId(UUID.randomUUID())
                 .amount(new BigDecimal("200.00"))
                 .paymentMethod("DEBIT_CARD")
@@ -114,7 +114,7 @@ class PaymentTest {
         // Domain não valida — validação fica no Service/DTO
         Payment payment = Payment.builder()
                 .id(UUID.randomUUID())
-                .userId(UUID.randomUUID())
+                .userId("user-1")
                 .orderId(UUID.randomUUID())
                 .amount(BigDecimal.ZERO)
                 .paymentMethod("PIX")
@@ -131,7 +131,7 @@ class PaymentTest {
     void shouldBuildPaymentWithCorrectAmountPrecision() {
         Payment payment = Payment.builder()
                 .id(UUID.randomUUID())
-                .userId(UUID.randomUUID())
+                .userId("user-1")
                 .orderId(UUID.randomUUID())
                 .amount(new BigDecimal("99.99"))
                 .paymentMethod("CREDIT_CARD")
@@ -146,7 +146,7 @@ class PaymentTest {
     private Payment createPendingPayment() {
         return Payment.builder()
                 .id(UUID.randomUUID())
-                .userId(UUID.randomUUID())
+                .userId("user-1")
                 .orderId(UUID.randomUUID())
                 .amount(new BigDecimal("100.00"))
                 .paymentMethod("CREDIT_CARD")

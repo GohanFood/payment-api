@@ -28,7 +28,7 @@ public interface PaymentRepository {
      */
     long countByUserId(String userId);
 
-    List<Payment> findByOrderId(UUID orderId);
+    List<Payment> findByReferenceId(String referenceId);
 
     Optional<Payment> findByMpPaymentId(Long mpPaymentId);
 

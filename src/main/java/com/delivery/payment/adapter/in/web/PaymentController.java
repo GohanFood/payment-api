@@ -150,7 +150,7 @@ public class PaymentController {
         return PaymentResponse.builder()
                 .id(payment.getId())
                 .userId(payment.getUserId())
-                .orderId(payment.getOrderId())
+                .referenceId(payment.getReferenceId())
                 .amount(payment.getAmount())
                 .paymentMethod(payment.getPaymentMethod())
                 .status(payment.getStatus())

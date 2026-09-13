@@ -41,7 +41,7 @@ public class CreatePaymentService implements CreatePaymentUseCase {
         Payment newPayment = Payment.builder()
                 .id(UUID.randomUUID())
                 .userId(userId)
-                .orderId(request.getOrderId())
+                .referenceId(request.getReferenceId())
                 .amount(request.getAmount())
                 .paymentMethod(request.getPaymentMethod())
                 .status(PaymentStatus.PENDING)
@@ -62,7 +62,7 @@ public class CreatePaymentService implements CreatePaymentUseCase {
         }
 
         Payment saved = paymentRepository.save(newPayment);
-        paymentMessagingPort.publishPaymentCreated(saved.getId(), saved.getOrderId());
+        paymentMessagingPort.publishPaymentCreated(saved.getId(), saved.getReferenceId());
         return saved;
     }
 
@@ -78,7 +78,7 @@ public class CreatePaymentService implements CreatePaymentUseCase {
             PixPaymentResponse mpResponse = pixGateway.createPixPayment(
                     idempotencyKey,
                     payment.getAmount(),
-                    "Pedido #" + payment.getOrderId(),
+                    "Assinatura " + payment.getReferenceId(),
                     payment.getPayerEmail(),
                     "",
                     "",
@@ -116,7 +116,7 @@ public class CreatePaymentService implements CreatePaymentUseCase {
                     .issuerId(request.getIssuerId())
                     .description(request.getDescription() != null
                             ? request.getDescription()
-                            : "Pedido " + payment.getOrderId())
+                            : "Assinatura " + payment.getReferenceId())
                     .payerEmail(request.getPayerEmail())
                     .identificationType(request.getPayerDocumentType())
                     .identificationNumber(request.getPayerDocumentNumber())

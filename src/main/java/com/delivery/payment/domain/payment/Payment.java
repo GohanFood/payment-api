@@ -15,7 +15,7 @@ public class Payment {
 
     private UUID id;
     private String userId;
-    private UUID orderId;
+    private String referenceId;
     private BigDecimal amount;
     private String paymentMethod;
     private PaymentStatus status;

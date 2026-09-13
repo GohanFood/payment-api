@@ -73,7 +73,7 @@ public class PaymentStatusSyncService {
             // isFinalStatus no início do método já previne reprocessamento
             payment.markAsCompleted(mpPaymentId);
             Payment updated = paymentRepository.save(payment);
-            paymentMessagingPort.publishPaymentCompleted(updated.getId(), updated.getOrderId());
+            paymentMessagingPort.publishPaymentCompleted(updated.getId(), updated.getReferenceId());
             log.info("Pagamento aprovado via webhook: paymentId={}, mpPaymentId={}",
                     payment.getId(), mpPaymentId);
 

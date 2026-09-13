@@ -35,8 +35,8 @@ public class RefundPaymentService implements RefundPaymentUseCase {
         payment.markAsRefunded();
         Payment updated = paymentRepository.save(payment);
 
-        paymentMessagingPort.publishPaymentRefunded(updated.getId(), updated.getOrderId());
-        log.info("Pagamento reembolsado: paymentId={}, orderId={}", paymentId, updated.getOrderId());
+        paymentMessagingPort.publishPaymentRefunded(updated.getId(), updated.getReferenceId());
+        log.info("Pagamento reembolsado: paymentId={}, referenceId={}", paymentId, updated.getReferenceId());
 
         return updated;
     }

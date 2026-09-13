@@ -21,34 +21,34 @@ public class KafkaPaymentProducer implements PaymentMessagingPort {
     private static final String PAYMENT_REFUNDED_TOPIC = "payment.refunded";
 
     @Override
-    public void publishPaymentCreated(UUID paymentId, UUID orderId) {
-        String message = buildMessage(paymentId, orderId);
+    public void publishPaymentCreated(UUID paymentId, String referenceId) {
+        String message = buildMessage(paymentId, referenceId);
         kafkaTemplate.send(PAYMENT_CREATED_TOPIC, paymentId.toString(), message);
-        log.info("Published payment.created: paymentId={}, orderId={}", paymentId, orderId);
+        log.info("Published payment.created: paymentId={}, referenceId={}", paymentId, referenceId);
     }
 
     @Override
-    public void publishPaymentCompleted(UUID paymentId, UUID orderId) {
-        String message = buildMessage(paymentId, orderId);
+    public void publishPaymentCompleted(UUID paymentId, String referenceId) {
+        String message = buildMessage(paymentId, referenceId);
         kafkaTemplate.send(PAYMENT_COMPLETED_TOPIC, paymentId.toString(), message);
-        log.info("Published payment.completed: paymentId={}, orderId={}", paymentId, orderId);
+        log.info("Published payment.completed: paymentId={}, referenceId={}", paymentId, referenceId);
     }
 
     @Override
-    public void publishPaymentFailed(UUID paymentId, UUID orderId) {
-        String message = buildMessage(paymentId, orderId);
+    public void publishPaymentFailed(UUID paymentId, String referenceId) {
+        String message = buildMessage(paymentId, referenceId);
         kafkaTemplate.send(PAYMENT_FAILED_TOPIC, paymentId.toString(), message);
-        log.info("Published payment.failed: paymentId={}, orderId={}", paymentId, orderId);
+        log.info("Published payment.failed: paymentId={}, referenceId={}", paymentId, referenceId);
     }
 
     @Override
-    public void publishPaymentRefunded(UUID paymentId, UUID orderId) {
-        String message = buildMessage(paymentId, orderId);
+    public void publishPaymentRefunded(UUID paymentId, String referenceId) {
+        String message = buildMessage(paymentId, referenceId);
         kafkaTemplate.send(PAYMENT_REFUNDED_TOPIC, paymentId.toString(), message);
-        log.info("Published payment.refunded: paymentId={}, orderId={}", paymentId, orderId);
+        log.info("Published payment.refunded: paymentId={}, referenceId={}", paymentId, referenceId);
     }
 
-    private String buildMessage(UUID paymentId, UUID orderId) {
-        return String.format("{\"paymentId\":\"%s\",\"orderId\":\"%s\"}", paymentId, orderId);
+    private String buildMessage(UUID paymentId, String referenceId) {
+        return String.format("{\"paymentId\":\"%s\",\"referenceId\":\"%s\"}", paymentId, referenceId);
     }
 }

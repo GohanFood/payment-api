@@ -54,11 +54,11 @@ class ProcessPaymentServiceTest {
     @Test
     void shouldProcessPaymentSuccessfully() {
         UUID paymentId = UUID.randomUUID();
-        UUID orderId = UUID.randomUUID();
+        String referenceId = "subscription:" + UUID.randomUUID();
         Payment pending = Payment.builder()
                 .id(paymentId)
                 .userId("user-1")
-                .orderId(orderId)
+                .referenceId(referenceId)
                 .amount(new BigDecimal("100.00"))
                 .paymentMethod("CREDIT_CARD")
                 .status(PaymentStatus.PENDING)
@@ -81,7 +81,7 @@ class ProcessPaymentServiceTest {
         assertNotNull(result);
         assertEquals(PaymentStatus.COMPLETED, result.getStatus());
         assertNotNull(result.getGatewayTransactionId());
-        verify(paymentMessagingPort).publishPaymentCompleted(eq(paymentId), eq(orderId));
+        verify(paymentMessagingPort).publishPaymentCompleted(eq(paymentId), eq(referenceId));
     }
 
     @Test
@@ -100,7 +100,7 @@ class ProcessPaymentServiceTest {
         Payment completed = Payment.builder()
                 .id(paymentId)
                 .userId("user-1")
-                .orderId(UUID.randomUUID())
+                .referenceId("subscription:" + UUID.randomUUID())
                 .amount(new BigDecimal("100.00"))
                 .paymentMethod("CREDIT_CARD")
                 .status(PaymentStatus.COMPLETED)
@@ -121,7 +121,7 @@ class ProcessPaymentServiceTest {
         Payment failed = Payment.builder()
                 .id(paymentId)
                 .userId("user-1")
-                .orderId(UUID.randomUUID())
+                .referenceId("subscription:" + UUID.randomUUID())
                 .amount(new BigDecimal("100.00"))
                 .paymentMethod("CREDIT_CARD")
                 .status(PaymentStatus.FAILED)
@@ -141,7 +141,7 @@ class ProcessPaymentServiceTest {
         Payment refunded = Payment.builder()
                 .id(paymentId)
                 .userId("user-1")
-                .orderId(UUID.randomUUID())
+                .referenceId("subscription:" + UUID.randomUUID())
                 .amount(new BigDecimal("100.00"))
                 .paymentMethod("CREDIT_CARD")
                 .status(PaymentStatus.REFUNDED)

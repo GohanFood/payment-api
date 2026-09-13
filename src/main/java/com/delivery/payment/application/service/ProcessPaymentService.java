@@ -46,7 +46,7 @@ public class ProcessPaymentService implements ProcessPaymentUseCase {
                 .issuerId(request.getIssuerId())
                 .description(request.getDescription() != null
                         ? request.getDescription()
-                        : "Pedido " + payment.getOrderId())
+                        : "Assinatura " + payment.getReferenceId())
                 .payerEmail(request.getPayerEmail())
                 .identificationType(request.getIdentificationType())
                 .identificationNumber(request.getIdentificationNumber())
@@ -60,7 +60,7 @@ public class ProcessPaymentService implements ProcessPaymentUseCase {
         if (gatewayResponse.isApproved()) {
             payment.markAsCompleted(gatewayResponse.getExternalId());
             Payment updated = paymentRepository.save(payment);
-            paymentMessagingPort.publishPaymentCompleted(updated.getId(), updated.getOrderId());
+            paymentMessagingPort.publishPaymentCompleted(updated.getId(), updated.getReferenceId());
             log.info("Pagamento aprovado: paymentId={}, mpPaymentId={}",
                     paymentId, gatewayResponse.getExternalId());
             return updated;

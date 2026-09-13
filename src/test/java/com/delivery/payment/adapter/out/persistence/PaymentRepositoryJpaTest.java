@@ -89,17 +89,17 @@ class PaymentRepositoryJpaTest {
     }
 
     @Test
-    void shouldFindByOrderId() {
-        UUID orderId = UUID.randomUUID();
+    void shouldFindByReferenceId() {
+        String referenceId = "subscription:" + UUID.randomUUID();
         PaymentEntity entity = createEntity(UUID.randomUUID(), "user-1", PaymentStatus.PENDING);
-        entity.setOrderId(orderId);
+        entity.setReferenceId(referenceId);
 
-        when(jpaRepository.findByOrderId(orderId)).thenReturn(List.of(entity));
+        when(jpaRepository.findByReferenceId(referenceId)).thenReturn(List.of(entity));
 
-        List<Payment> result = repository.findByOrderId(orderId);
+        List<Payment> result = repository.findByReferenceId(referenceId);
 
         assertEquals(1, result.size());
-        assertEquals(orderId, result.get(0).getOrderId());
+        assertEquals(referenceId, result.get(0).getReferenceId());
     }
 
     @Test
@@ -126,7 +126,7 @@ class PaymentRepositoryJpaTest {
         return Payment.builder()
                 .id(id)
                 .userId(userId)
-                .orderId(UUID.randomUUID())
+                .referenceId("subscription:" + UUID.randomUUID())
                 .amount(new BigDecimal("100.00"))
                 .paymentMethod(method)
                 .status(status)
@@ -139,7 +139,7 @@ class PaymentRepositoryJpaTest {
         return PaymentEntity.builder()
                 .id(id)
                 .userId(userId)
-                .orderId(UUID.randomUUID())
+                .referenceId("subscription:" + UUID.randomUUID())
                 .amount(new BigDecimal("150.00"))
                 .paymentMethod("CREDIT_CARD")
                 .status(status)

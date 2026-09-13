@@ -14,13 +14,13 @@ class PaymentTest {
     void shouldCreatePaymentWithAllFields() {
         UUID id = UUID.randomUUID();
         String userId = "user-1";
-        UUID orderId = UUID.randomUUID();
+        String referenceId = "subscription:" + UUID.randomUUID();
         LocalDateTime now = LocalDateTime.now();
 
         Payment payment = Payment.builder()
                 .id(id)
                 .userId(userId)
-                .orderId(orderId)
+                .referenceId(referenceId)
                 .amount(new BigDecimal("150.00"))
                 .paymentMethod("CREDIT_CARD")
                 .status(PaymentStatus.PENDING)
@@ -31,7 +31,7 @@ class PaymentTest {
         assertNotNull(payment);
         assertEquals(id, payment.getId());
         assertEquals(userId, payment.getUserId());
-        assertEquals(orderId, payment.getOrderId());
+        assertEquals(referenceId, payment.getReferenceId());
         assertEquals(new BigDecimal("150.00"), payment.getAmount());
         assertEquals("CREDIT_CARD", payment.getPaymentMethod());
         assertEquals(PaymentStatus.PENDING, payment.getStatus());
@@ -72,7 +72,7 @@ class PaymentTest {
         Payment payment = Payment.builder()
                 .id(UUID.randomUUID())
                 .userId("user-1")
-                .orderId(UUID.randomUUID())
+                .referenceId("subscription:" + UUID.randomUUID())
                 .amount(new BigDecimal("50.00"))
                 .paymentMethod("PIX")
                 .status(PaymentStatus.PENDING)
@@ -94,7 +94,7 @@ class PaymentTest {
         Payment payment = Payment.builder()
                 .id(UUID.randomUUID())
                 .userId("user-1")
-                .orderId(UUID.randomUUID())
+                .referenceId("subscription:" + UUID.randomUUID())
                 .amount(new BigDecimal("200.00"))
                 .paymentMethod("DEBIT_CARD")
                 .status(PaymentStatus.PENDING)
@@ -115,7 +115,7 @@ class PaymentTest {
         Payment payment = Payment.builder()
                 .id(UUID.randomUUID())
                 .userId("user-1")
-                .orderId(UUID.randomUUID())
+                .referenceId("subscription:" + UUID.randomUUID())
                 .amount(BigDecimal.ZERO)
                 .paymentMethod("PIX")
                 .status(PaymentStatus.PENDING)
@@ -132,7 +132,7 @@ class PaymentTest {
         Payment payment = Payment.builder()
                 .id(UUID.randomUUID())
                 .userId("user-1")
-                .orderId(UUID.randomUUID())
+                .referenceId("subscription:" + UUID.randomUUID())
                 .amount(new BigDecimal("99.99"))
                 .paymentMethod("CREDIT_CARD")
                 .status(PaymentStatus.PENDING)
@@ -147,7 +147,7 @@ class PaymentTest {
         return Payment.builder()
                 .id(UUID.randomUUID())
                 .userId("user-1")
-                .orderId(UUID.randomUUID())
+                .referenceId("subscription:" + UUID.randomUUID())
                 .amount(new BigDecimal("100.00"))
                 .paymentMethod("CREDIT_CARD")
                 .status(PaymentStatus.PENDING)

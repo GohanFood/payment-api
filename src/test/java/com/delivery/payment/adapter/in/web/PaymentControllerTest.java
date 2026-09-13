@@ -91,14 +91,14 @@ class PaymentControllerTest {
     @Test
     void shouldCreatePayment() throws Exception {
         CreatePaymentRequest request = new CreatePaymentRequest();
-        request.setOrderId(UUID.randomUUID());
+        request.setReferenceId("subscription:" + UUID.randomUUID());
         request.setAmount(new BigDecimal("150.00"));
         request.setPaymentMethod("CREDIT_CARD");
 
         Payment payment = Payment.builder()
                 .id(UUID.randomUUID())
                 .userId(TEST_USER_ID)
-                .orderId(request.getOrderId())
+                .referenceId(request.getReferenceId())
                 .amount(request.getAmount())
                 .paymentMethod(request.getPaymentMethod())
                 .status(PaymentStatus.PENDING)
@@ -120,7 +120,7 @@ class PaymentControllerTest {
     @Test
     void shouldRejectUnauthorizedRequest() throws Exception {
         CreatePaymentRequest request = new CreatePaymentRequest();
-        request.setOrderId(UUID.randomUUID());
+        request.setReferenceId("subscription:" + UUID.randomUUID());
         request.setAmount(new BigDecimal("100.00"));
         request.setPaymentMethod("PIX");
 
@@ -140,7 +140,7 @@ class PaymentControllerTest {
         Payment payment = Payment.builder()
                 .id(paymentId)
                 .userId(TEST_USER_ID)
-                .orderId(UUID.randomUUID())
+                .referenceId("subscription:" + UUID.randomUUID())
                 .amount(new BigDecimal("150.00"))
                 .paymentMethod("CREDIT_CARD")
                 .status(PaymentStatus.COMPLETED)
@@ -166,7 +166,7 @@ class PaymentControllerTest {
         Payment payment = Payment.builder()
                 .id(paymentId)
                 .userId(TEST_USER_ID)
-                .orderId(UUID.randomUUID())
+                .referenceId("subscription:" + UUID.randomUUID())
                 .amount(new BigDecimal("200.00"))
                 .paymentMethod("PIX")
                 .status(PaymentStatus.PENDING)
@@ -198,7 +198,7 @@ class PaymentControllerTest {
         Payment p1 = Payment.builder()
                 .id(UUID.randomUUID())
                 .userId(TEST_USER_ID)
-                .orderId(UUID.randomUUID())
+                .referenceId("subscription:" + UUID.randomUUID())
                 .amount(new BigDecimal("100.00"))
                 .paymentMethod("CREDIT_CARD")
                 .status(PaymentStatus.COMPLETED)
@@ -224,7 +224,7 @@ class PaymentControllerTest {
         Payment payment = Payment.builder()
                 .id(paymentId)
                 .userId(TEST_USER_ID)
-                .orderId(UUID.randomUUID())
+                .referenceId("subscription:" + UUID.randomUUID())
                 .amount(new BigDecimal("100.00"))
                 .paymentMethod("CREDIT_CARD")
                 .status(PaymentStatus.REFUNDED)

@@ -8,7 +8,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
-import java.util.UUID;
 
 @Data
 @Builder
@@ -17,7 +16,7 @@ import java.util.UUID;
 public class CreatePaymentRequest {
 
     @NotNull
-    private UUID orderId;
+    private String referenceId;
 
     @NotNull
     @Positive

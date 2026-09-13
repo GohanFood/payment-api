@@ -40,11 +40,11 @@ class RefundPaymentServiceTest {
     @Test
     void shouldRefundPaymentSuccessfully() {
         UUID paymentId = UUID.randomUUID();
-        UUID orderId = UUID.randomUUID();
+        String referenceId = "subscription:" + UUID.randomUUID();
         Payment original = Payment.builder()
                 .id(paymentId)
                 .userId("user-1")
-                .orderId(orderId)
+                .referenceId(referenceId)
                 .amount(new BigDecimal("100.00"))
                 .paymentMethod("CREDIT_CARD")
                 .status(PaymentStatus.COMPLETED)
@@ -56,7 +56,7 @@ class RefundPaymentServiceTest {
         Payment refunded = Payment.builder()
                 .id(paymentId)
                 .userId("user-1")
-                .orderId(orderId)
+                .referenceId(referenceId)
                 .amount(original.getAmount())
                 .paymentMethod(original.getPaymentMethod())
                 .status(PaymentStatus.REFUNDED)
@@ -72,7 +72,7 @@ class RefundPaymentServiceTest {
 
         assertNotNull(result);
         assertEquals(PaymentStatus.REFUNDED, result.getStatus());
-        verify(paymentMessagingPort).publishPaymentRefunded(eq(paymentId), eq(orderId));
+        verify(paymentMessagingPort).publishPaymentRefunded(eq(paymentId), eq(referenceId));
     }
 
     @Test
@@ -90,7 +90,7 @@ class RefundPaymentServiceTest {
         Payment pending = Payment.builder()
                 .id(paymentId)
                 .userId("user-1")
-                .orderId(UUID.randomUUID())
+                .referenceId("subscription:" + UUID.randomUUID())
                 .amount(new BigDecimal("75.00"))
                 .paymentMethod("PIX")
                 .status(PaymentStatus.PENDING)
@@ -111,7 +111,7 @@ class RefundPaymentServiceTest {
         Payment completed = Payment.builder()
                 .id(paymentId)
                 .userId("user-1")
-                .orderId(UUID.randomUUID())
+                .referenceId("subscription:" + UUID.randomUUID())
                 .amount(new BigDecimal("300.00"))
                 .paymentMethod("CREDIT_CARD")
                 .status(PaymentStatus.COMPLETED)

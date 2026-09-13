@@ -54,8 +54,8 @@ public class PaymentRepositoryJpa implements PaymentRepository {
     }
 
     @Override
-    public List<Payment> findByOrderId(UUID orderId) {
-        return jpaRepository.findByOrderId(orderId).stream()
+    public List<Payment> findByReferenceId(String referenceId) {
+        return jpaRepository.findByReferenceId(referenceId).stream()
                 .map(mapper::toDomain)
                 .toList();
     }

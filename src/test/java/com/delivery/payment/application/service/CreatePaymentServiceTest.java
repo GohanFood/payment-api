@@ -49,7 +49,7 @@ class CreatePaymentServiceTest {
 
     private CreatePaymentRequest buildRequest(String method) {
         return CreatePaymentRequest.builder()
-                .orderId(UUID.randomUUID())
+                .referenceId("subscription:" + UUID.randomUUID())
                 .amount(new BigDecimal("150.00"))
                 .paymentMethod(method)
                 .payerEmail("test@email.com")
@@ -75,7 +75,7 @@ class CreatePaymentServiceTest {
     @Test
     void shouldRejectZeroAmount() {
         CreatePaymentRequest request = CreatePaymentRequest.builder()
-                .orderId(UUID.randomUUID())
+                .referenceId("subscription:" + UUID.randomUUID())
                 .amount(BigDecimal.ZERO)
                 .paymentMethod("PIX")
                 .build();
@@ -87,7 +87,7 @@ class CreatePaymentServiceTest {
     @Test
     void shouldRejectNegativeAmount() {
         CreatePaymentRequest request = CreatePaymentRequest.builder()
-                .orderId(UUID.randomUUID())
+                .referenceId("subscription:" + UUID.randomUUID())
                 .amount(new BigDecimal("-10.00"))
                 .paymentMethod("PIX")
                 .build();
@@ -99,7 +99,7 @@ class CreatePaymentServiceTest {
     @Test
     void shouldCreatePixPaymentAndCallMercadoPago() {
         CreatePaymentRequest request = CreatePaymentRequest.builder()
-                .orderId(UUID.randomUUID())
+                .referenceId("subscription:" + UUID.randomUUID())
                 .amount(new BigDecimal("200.00"))
                 .paymentMethod("PIX")
                 .payerEmail("pix@email.com")
@@ -130,7 +130,7 @@ class CreatePaymentServiceTest {
     @Test
     void shouldCreateCardPaymentAndCallMercadoPago() {
         CreatePaymentRequest request = CreatePaymentRequest.builder()
-                .orderId(UUID.randomUUID())
+                .referenceId("subscription:" + UUID.randomUUID())
                 .amount(new BigDecimal("89.90"))
                 .paymentMethod("CREDIT_CARD")
                 .payerEmail("card@email.com")
@@ -164,7 +164,7 @@ class CreatePaymentServiceTest {
     @Test
     void shouldCreateCardPaymentWithoutTokenAsPendingOnly() {
         CreatePaymentRequest request = CreatePaymentRequest.builder()
-                .orderId(UUID.randomUUID())
+                .referenceId("subscription:" + UUID.randomUUID())
                 .amount(new BigDecimal("50.00"))
                 .paymentMethod("CREDIT_CARD")
                 .build();

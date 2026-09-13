@@ -7,6 +7,7 @@ import com.delivery.payment.application.dto.response.PaymentResponse;
 import com.delivery.payment.application.usecase.*;
 import com.delivery.payment.application.service.PaymentStatusSyncService;
 import com.delivery.payment.config.MercadoPagoWebhookValidator;
+import com.delivery.payment.adapter.out.callback.SubscriptionPaymentCallbackClient;
 import com.delivery.payment.domain.payment.Payment;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import com.delivery.payment.domain.payment.PaymentStatus;
 
 @Slf4j
 @RestController
@@ -37,12 +39,14 @@ public class PaymentController {
     private final PaymentStatusSyncService paymentStatusSyncService;
     private final MercadoPagoWebhookValidator webhookValidator;
     private final ObjectMapper objectMapper;
+    private final SubscriptionPaymentCallbackClient paymentCallbackClient;
 
     @PostMapping
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<PaymentResponse> create(@Valid @RequestBody CreatePaymentRequest request) {
         String userId = getCurrentUserId();
         Payment created = createPaymentUseCase.execute(request, userId);
+        sendCallbackIfFinal(created);
         return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(created));
     }
 
@@ -51,6 +55,7 @@ public class PaymentController {
     public ResponseEntity<PaymentResponse> process(@PathVariable UUID id,
                                                     @Valid @RequestBody ProcessPaymentRequest request) {
         Payment processed = processPaymentUseCase.execute(id, request);
+        sendCallbackIfFinal(processed);
         return ResponseEntity.ok(toResponse(processed));
     }
 
@@ -75,6 +80,7 @@ public class PaymentController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<PaymentResponse> refund(@Valid @RequestBody RefundPaymentRequest request) {
         Payment refunded = refundPaymentUseCase.execute(request.getPaymentId());
+        sendCallbackIfFinal(refunded);
         return ResponseEntity.ok(toResponse(refunded));
     }
 
@@ -168,5 +174,14 @@ public class PaymentController {
                 .createdAt(payment.getCreatedAt())
                 .updatedAt(payment.getUpdatedAt())
                 .build();
+    }
+
+    private void sendCallbackIfFinal(Payment payment) {
+        if (payment.getStatus() == PaymentStatus.COMPLETED
+                || payment.getStatus() == PaymentStatus.FAILED
+                || payment.getStatus() == PaymentStatus.REFUNDED
+                || payment.getStatus() == PaymentStatus.CANCELLED) {
+            paymentCallbackClient.send(payment);
+        }
     }
 }

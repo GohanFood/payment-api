@@ -12,11 +12,15 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-payment:5432/paymentdb
       - SPRING_DATASOURCE_USERNAME=${DB_USERNAME:-paymentapi}
       - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-paymentapi123}
-      - JWT_SECRET=${JWT_SECRET:-dev-secret-key}
+      # Deve coincidir com o JWT_SECRET do backend Alexandria para validar o
+      # token do usuário repassado durante o checkout.
+      - JWT_SECRET=${JWT_SECRET:-dev-secret-key-not-for-production-min-256bits}
       - MERCADOPAGO_ACCESS_TOKEN=${MERCADOPAGO_ACCESS_TOKEN:-}
       - MERCADOPAGO_PUBLIC_KEY=${MERCADOPAGO_PUBLIC_KEY:-}
       - MERCADOPAGO_WEBHOOK_SECRET=${MERCADOPAGO_WEBHOOK_SECRET:-}
       - MERCADOPAGO_ENVIRONMENT=${MERCADOPAGO_ENVIRONMENT:-sandbox}
+      - PAYMENT_CALLBACK_URL=${PAYMENT_CALLBACK_URL:-}
+      - SUBSCRIPTION_CALLBACK_SECRET=${SUBSCRIPTION_CALLBACK_SECRET:-}
     depends_on:
       postgres-payment:
         condition: service_healthy

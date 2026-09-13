@@ -40,6 +40,11 @@ public class Payment {
     public void markAsCompleted(String gatewayTransactionId) {
         this.status = PaymentStatus.COMPLETED;
         this.gatewayTransactionId = gatewayTransactionId;
+        try {
+            this.mpPaymentId = Long.valueOf(gatewayTransactionId);
+        } catch (NumberFormatException ignored) {
+            // Test gateways may return non-numeric transaction ids.
+        }
     }
 
     public void markAsFailed() {

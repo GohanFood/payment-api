@@ -52,9 +52,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     .parseSignedClaims(token)
                     .getPayload();
 
-            String subject = claims.getSubject();
+            Object userIdClaim = claims.get("userId");
+            String subject = userIdClaim != null ? userIdClaim.toString() : claims.getSubject();
 
-            // Compatibilidade com token da user-api que usa claim "id" em vez de "sub"
+            // Compatibilidade com tokens legados que usam claim "id" em vez de "sub".
             if (subject == null) {
                 Object idClaim = claims.get("id");
                 subject = idClaim != null ? idClaim.toString() : null;

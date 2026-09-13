@@ -18,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.util.UUID;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -218,5 +219,25 @@ class CreatePaymentServiceTest {
 
         assertNotNull(result.getId());
         verify(paymentRepository).save(any());
+    }
+
+    @Test
+    void shouldReturnExistingPaymentForSameReferenceAndUser() {
+        CreatePaymentRequest request = buildRequest("CREDIT_CARD");
+        Payment existing = Payment.builder()
+                .id(UUID.randomUUID())
+                .userId(USER_ID)
+                .referenceId(request.getReferenceId())
+                .amount(request.getAmount())
+                .paymentMethod("CREDIT_CARD")
+                .status(PaymentStatus.COMPLETED)
+                .build();
+        when(paymentRepository.findByReferenceId(request.getReferenceId())).thenReturn(List.of(existing));
+
+        Payment result = service.execute(request, USER_ID);
+
+        assertSame(existing, result);
+        verify(paymentRepository, never()).save(any());
+        verifyNoInteractions(paymentMessagingPort, cardGateway, pixGateway);
     }
 }

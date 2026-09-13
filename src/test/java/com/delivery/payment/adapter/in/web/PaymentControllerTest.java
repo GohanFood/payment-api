@@ -8,6 +8,7 @@ import com.delivery.payment.application.usecase.*;
 import com.delivery.payment.config.JwtConfig;
 import com.delivery.payment.config.MercadoPagoWebhookValidator;
 import com.delivery.payment.config.SecurityConfig;
+import com.delivery.payment.adapter.out.callback.SubscriptionPaymentCallbackClient;
 import com.delivery.payment.domain.payment.Payment;
 import com.delivery.payment.domain.payment.PaymentStatus;
 import com.delivery.payment.domain.payment.exception.PaymentNotFoundException;
@@ -70,6 +71,9 @@ class PaymentControllerTest {
 
     @MockBean
     private MercadoPagoWebhookValidator webhookValidator;
+
+    @MockBean
+    private SubscriptionPaymentCallbackClient paymentCallbackClient;
 
     private String jwtToken;
     private static final String TEST_USER_ID = "user-123";

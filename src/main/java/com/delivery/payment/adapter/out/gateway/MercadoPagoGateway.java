@@ -20,6 +20,7 @@ import com.mercadopago.client.payment.PaymentPayerRequest;
 import com.mercadopago.core.MPRequestOptions;
 import com.mercadopago.exceptions.MPApiException;
 import com.mercadopago.exceptions.MPException;
+import com.mercadopago.net.MPSearchRequest;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -303,7 +304,7 @@ public class MercadoPagoGateway
     public CustomerCardReference createCustomerWithCard(CreateCustomerCommand command) {
         assertReady();
 
-        log.info("Criando Customer e salvando cartão no Mercado Pago: email={}", command.getEmail());
+        log.info("Obtendo ou criando Customer e salvando cartão no Mercado Pago: email={}", command.getEmail());
 
         try {
             CustomerClient client = new CustomerClient();
@@ -315,7 +316,13 @@ public class MercadoPagoGateway
                     .identification(buildIdentification(command.getDocumentType(), command.getDocumentNumber()))
                     .build();
 
-            com.mercadopago.resources.customer.Customer customer = client.create(customerRequest);
+            com.mercadopago.resources.customer.Customer customer = findCustomerByEmail(client, command.getEmail());
+            if (customer == null) {
+                customer = client.create(customerRequest);
+                log.info("Customer criado no Mercado Pago: customerId={}", customer.getId());
+            } else {
+                log.info("Customer existente reutilizado no Mercado Pago: customerId={}", customer.getId());
+            }
 
             com.mercadopago.resources.customer.CustomerCard card = client.createCard(
                     customer.getId(),
@@ -380,6 +387,23 @@ public class MercadoPagoGateway
     // ──────────────────────────────────────────────
     //  Métodos auxiliares
     // ──────────────────────────────────────────────
+
+    /**
+     * O Mercado Pago não permite mais de um Customer para o mesmo e-mail.
+     * A busca torna o cadastro idempotente e permite anexar um novo cartão
+     * quando o comprador volta a assinar ou troca o meio de pagamento.
+     */
+    private com.mercadopago.resources.customer.Customer findCustomerByEmail(
+            CustomerClient client, String email) throws MPException, MPApiException {
+        var page = client.search(MPSearchRequest.builder()
+                .filters(Map.of("email", email))
+                .limit(1)
+                // sdk-java 2.8.0 inclui offset na query; não pode ser nulo.
+                .offset(0)
+                .build());
+
+        return page.getResults().isEmpty() ? null : page.getResults().get(0);
+    }
 
     private PaymentCreateRequest buildCardPaymentRequest(PaymentGatewayRequest request) {
         if (request.usesSavedCard()) {

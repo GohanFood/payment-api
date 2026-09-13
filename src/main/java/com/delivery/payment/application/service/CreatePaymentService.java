@@ -38,6 +38,18 @@ public class CreatePaymentService implements CreatePaymentUseCase {
             throw new InvalidPaymentAmountException(request.getAmount());
         }
 
+        // The caller's reference identifies one business payment (for example, one
+        // subscription cycle). Returning it makes retries safe even after a timeout.
+        Payment existing = paymentRepository.findByReferenceId(request.getReferenceId()).stream()
+                .filter(payment -> userId.equals(payment.getUserId()))
+                .findFirst()
+                .orElse(null);
+        if (existing != null) {
+            log.info("Pagamento idempotente reutilizado: paymentId={}, referenceId={}",
+                    existing.getId(), request.getReferenceId());
+            return existing;
+        }
+
         Payment newPayment = Payment.builder()
                 .id(UUID.randomUUID())
                 .userId(userId)

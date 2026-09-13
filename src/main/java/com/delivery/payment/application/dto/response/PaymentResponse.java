@@ -24,6 +24,8 @@ public class PaymentResponse {
     private PaymentStatus status;
     private String gatewayTransactionId;
     private Long mpPaymentId;
+    private String customerId;
+    private String cardId;
     private String qrCode;
     private String qrCodeBase64;
     private String ticketUrl;

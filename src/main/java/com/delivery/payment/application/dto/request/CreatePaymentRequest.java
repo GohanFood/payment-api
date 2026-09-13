@@ -36,6 +36,12 @@ public class CreatePaymentRequest {
     /** CardToken gerado pelo MercadoPago.js CardForm */
     private String gatewayToken;
 
+    /** Cartão salvo (recorrência). Alternativa a {@code gatewayToken}. */
+    private String cardId;
+
+    /** ID do Customer no Mercado Pago (obrigatório quando usa {@code cardId}). */
+    private String customerId;
+
     /** Número de parcelas (default: 1) */
     @Builder.Default
     private Integer installments = 1;

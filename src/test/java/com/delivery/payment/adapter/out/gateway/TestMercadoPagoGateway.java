@@ -1,8 +1,12 @@
 package com.delivery.payment.adapter.out.gateway;
 
 import com.delivery.payment.application.dto.response.PixPaymentResponse;
+import com.delivery.payment.domain.customer.AddCardCommand;
+import com.delivery.payment.domain.customer.CreateCustomerCommand;
+import com.delivery.payment.domain.customer.CustomerCardReference;
 import com.delivery.payment.domain.payment.gateway.PaymentGatewayRequest;
 import com.delivery.payment.domain.payment.gateway.PaymentGatewayResponse;
+import com.delivery.payment.port.CustomerGatewayPort;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
@@ -22,7 +26,8 @@ import java.math.BigDecimal;
 @Profile("test")
 public class TestMercadoPagoGateway
         implements com.delivery.payment.port.PaymentGatewayPort,
-                   com.delivery.payment.domain.payment.gateway.PaymentGatewayPort {
+                   com.delivery.payment.domain.payment.gateway.PaymentGatewayPort,
+                   CustomerGatewayPort {
 
     @Override
     public PixPaymentResponse createPixPayment(
@@ -73,5 +78,30 @@ public class TestMercadoPagoGateway
                 .externalStatus("approved")
                 .externalStatusDetail("accredited")
                 .build();
+    }
+
+    @Override
+    public CustomerCardReference createCustomerWithCard(CreateCustomerCommand command) {
+        log.info("Test MP Stub: criando customer email={}", command.getEmail());
+        return CustomerCardReference.builder()
+                .customerId("TEST-CUSTOMER-1")
+                .cardId("TEST-CARD-1")
+                .paymentMethodId(command.getPaymentMethodId() != null ? command.getPaymentMethodId() : "master")
+                .build();
+    }
+
+    @Override
+    public CustomerCardReference addCard(String customerId, AddCardCommand command) {
+        log.info("Test MP Stub: adicionando cartão customerId={}", customerId);
+        return CustomerCardReference.builder()
+                .customerId(customerId)
+                .cardId("TEST-CARD-2")
+                .paymentMethodId(command.getPaymentMethodId() != null ? command.getPaymentMethodId() : "visa")
+                .build();
+    }
+
+    @Override
+    public void deleteCard(String customerId, String cardId) {
+        log.info("Test MP Stub: removendo cartão customerId={}, cardId={}", customerId, cardId);
     }
 }

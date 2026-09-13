@@ -53,6 +53,10 @@ class PaymentApiIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        // Isola os testes: cada método começa com a tabela de pagamentos limpa,
+        // evitando interferência entre testes que compartilham o mesmo banco.
+        paymentRepository.findAll().forEach(paymentRepository::delete);
+
         SecretKey key = Keys.hmacShaKeyFor(JWT_SECRET.getBytes(StandardCharsets.UTF_8));
         jwtToken = Jwts.builder()
                 .subject("user-integration-test")

@@ -156,6 +156,8 @@ public class PaymentController {
                 .status(payment.getStatus())
                 .gatewayTransactionId(payment.getGatewayTransactionId())
                 .mpPaymentId(payment.getMpPaymentId())
+                .customerId(payment.getCustomerId())
+                .cardId(payment.getCardId())
                 .qrCode(payment.getQrCode())
                 .qrCodeBase64(payment.getQrCodeBase64())
                 .ticketUrl(payment.getTicketUrl())

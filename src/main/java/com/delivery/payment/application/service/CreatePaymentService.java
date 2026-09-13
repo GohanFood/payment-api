@@ -48,6 +48,8 @@ public class CreatePaymentService implements CreatePaymentUseCase {
                 .payerEmail(request.getPayerEmail())
                 .payerDocumentType(request.getPayerDocumentType())
                 .payerDocumentNumber(request.getPayerDocumentNumber())
+                .customerId(request.getCustomerId())
+                .cardId(request.getCardId())
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
@@ -57,7 +59,8 @@ public class CreatePaymentService implements CreatePaymentUseCase {
             processPixPayment(newPayment, request);
         }
         // Integração com Mercado Pago para Cartão (CREDIT_CARD, DEBIT_CARD)
-        else if (isCardPayment(request) && request.getGatewayToken() != null) {
+        // via cardToken (cartão novo) ou cardId (cartão salvo/recorrência)
+        else if (isCardPayment(request) && hasCardSource(request)) {
             processCardPayment(newPayment, request);
         }
 
@@ -69,6 +72,11 @@ public class CreatePaymentService implements CreatePaymentUseCase {
     private boolean isCardPayment(CreatePaymentRequest request) {
         String method = request.getPaymentMethod();
         return "CREDIT_CARD".equalsIgnoreCase(method) || "DEBIT_CARD".equalsIgnoreCase(method);
+    }
+
+    private boolean hasCardSource(CreatePaymentRequest request) {
+        return (request.getGatewayToken() != null && !request.getGatewayToken().isBlank())
+                || (request.getCardId() != null && !request.getCardId().isBlank());
     }
 
     private void processPixPayment(Payment payment, CreatePaymentRequest request) {
@@ -110,6 +118,8 @@ public class CreatePaymentService implements CreatePaymentUseCase {
         try {
             PaymentGatewayRequest gatewayRequest = PaymentGatewayRequest.builder()
                     .cardToken(request.getGatewayToken())
+                    .cardId(request.getCardId())
+                    .customerId(request.getCustomerId())
                     .transactionAmount(payment.getAmount())
                     .installments(request.getInstallments() != null ? request.getInstallments() : 1)
                     .paymentMethodId(request.getPaymentMethodId())

@@ -12,8 +12,14 @@ import java.math.BigDecimal;
 @Builder
 public class PaymentGatewayRequest {
 
-    /** Token do cartão gerado pelo MercadoPago.js (CardToken) */
+    /** Token do cartão gerado pelo MercadoPago.js (CardToken) — fluxo de cartão novo. */
     private final String cardToken;
+
+    /** Cartão salvo (recorrência). Alternativa a {@code cardToken}. */
+    private final String cardId;
+
+    /** ID do Customer no Mercado Pago (obrigatório quando usa {@code cardId}). */
+    private final String customerId;
 
     /** Valor da transação */
     private final BigDecimal transactionAmount;
@@ -41,4 +47,9 @@ public class PaymentGatewayRequest {
 
     /** ID externo do pagamento (nosso paymentId) para idempotência */
     private final String idempotencyKey;
+
+    /** Retorna {@code true} se a cobrança usa cartão salvo (cardId) em vez de cardToken. */
+    public boolean usesSavedCard() {
+        return cardId != null && !cardId.isBlank();
+    }
 }

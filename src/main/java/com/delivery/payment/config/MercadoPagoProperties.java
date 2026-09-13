@@ -67,4 +67,9 @@ public class MercadoPagoProperties {
     public boolean isProductionToken() {
         return isTokenConfigured() && accessToken.startsWith("APP_USR-");
     }
+
+    /** Retorna {@code true} se o ambiente configurado é produção. */
+    public boolean isProductionEnvironment() {
+        return "production".equalsIgnoreCase(environment);
+    }
 }

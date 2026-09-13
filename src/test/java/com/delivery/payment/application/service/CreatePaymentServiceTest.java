@@ -162,6 +162,36 @@ class CreatePaymentServiceTest {
     }
 
     @Test
+    void shouldCreateCardPaymentWithSavedCard() {
+        CreatePaymentRequest request = CreatePaymentRequest.builder()
+                .referenceId("subscription:" + UUID.randomUUID())
+                .amount(new BigDecimal("89.90"))
+                .paymentMethod("CREDIT_CARD")
+                .cardId("saved-card-id")
+                .customerId("customer-id")
+                .installments(1)
+                .description("Cobrança recorrente")
+                .build();
+
+        PaymentGatewayResponse gatewayResponse = PaymentGatewayResponse.builder()
+                .externalId("987654321")
+                .externalStatus("approved")
+                .externalStatusDetail("accredited")
+                .paymentTypeId("credit_card")
+                .build();
+
+        when(cardGateway.processCardPayment(any(PaymentGatewayRequest.class))).thenReturn(gatewayResponse);
+        when(paymentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Payment result = service.execute(request, USER_ID);
+
+        assertEquals(PaymentStatus.COMPLETED, result.getStatus());
+        assertEquals("customer-id", result.getCustomerId());
+        assertEquals("saved-card-id", result.getCardId());
+        verify(cardGateway).processCardPayment(any(PaymentGatewayRequest.class));
+    }
+
+    @Test
     void shouldCreateCardPaymentWithoutTokenAsPendingOnly() {
         CreatePaymentRequest request = CreatePaymentRequest.builder()
                 .referenceId("subscription:" + UUID.randomUUID())

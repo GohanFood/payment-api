@@ -287,6 +287,101 @@
 
 ---
 
+## POST /api/v1/customers
+**Purpose:** Criar um Customer no Mercado Pago e salvar um cartão (Customer + Card)
+**Auth:** Bearer JWT
+
+**Request:**
+```json
+{
+  "email": "cliente@email.com",
+  "firstName": "João",
+  "lastName": "Silva",
+  "documentType": "CPF",
+  "documentNumber": "19119119100",
+  "cardToken": "CARD_TOKEN_DO_MERCADOPAGO_JS",
+  "paymentMethodId": "master"
+}
+```
+> **Campos obrigatórios:** `email`, `cardToken`.
+> `paymentMethodId` é opcional (bandeira: `visa`, `master`, `elo`, `amex`).
+
+**Response 201:**
+```json
+{
+  "customerId": "123456789-abcdef",
+  "cardId": "987654321",
+  "paymentMethodId": "master"
+}
+```
+> Retorna apenas tokens (`customerId`, `cardId`). Nenhum dado de cartão é armazenado.
+
+**Error responses:**
+| Status | Code | Meaning |
+|--------|------|---------|
+| 400 | INVALID_INPUT | `email` ou `cardToken` ausentes |
+| 401 | UNAUTHORIZED | Token ausente ou inválido |
+| 502 | GATEWAY_UNAVAILABLE | Mercado Pago indisponível |
+
+---
+
+## POST /api/v1/customers/{customerId}/cards
+**Purpose:** Adicionar/substituir o cartão salvo de um Customer (troca de cartão)
+**Auth:** Bearer JWT
+
+**Path param:** `customerId` (ID do Customer no Mercado Pago)
+
+**Request:**
+```json
+{
+  "cardToken": "NOVO_CARD_TOKEN",
+  "paymentMethodId": "visa"
+}
+```
+> **Campos obrigatórios:** `cardToken`.
+
+**Response 201:**
+```json
+{
+  "cardId": "1122334455",
+  "paymentMethodId": "visa"
+}
+```
+
+---
+
+## DELETE /api/v1/customers/{customerId}/cards/{cardId}
+**Purpose:** Remover um cartão salvo de um Customer (ex.: cancelamento de recorrência)
+**Auth:** Bearer JWT
+
+**Path params:** `customerId`, `cardId`
+
+**Response 204:** No Content
+
+---
+
+## Cobrança recorrente (cartão salvo)
+
+O `POST /api/v1/payments` também aceita `cardId` + `customerId` no lugar de `gatewayToken`,
+para cobrar um cartão salvo (recorrência).
+
+**Request (cartão salvo):**
+```json
+{
+  "referenceId": "assinatura:123",
+  "amount": 89.90,
+  "paymentMethod": "CREDIT_CARD",
+  "cardId": "987654321",
+  "customerId": "123456789-abcdef",
+  "installments": 1,
+  "description": "Cobrança recorrente"
+}
+```
+> Quando `cardId` está presente, o gateway usa `payer.type = "customer"` + `customerId`
+> e não exige `gatewayToken`.
+
+---
+
 ## Kafka Topics
 
 ### Producers (PaymentAPI → outros serviços)

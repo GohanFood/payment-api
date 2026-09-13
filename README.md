@@ -160,8 +160,12 @@ Use estes cartões no ambiente de testes do Mercado Pago:
 | GET | `/api/v1/payments` | Listar pagamentos do usuário autenticado | JWT |
 | POST | `/api/v1/payments/refund` | Reembolsar pagamento | JWT |
 | POST | `/api/v1/payments/webhook` | Webhook IPN Mercado Pago | — |
+| POST | `/api/v1/customers` | Criar Customer + salvar cartão (Customer + Card) | JWT |
+| POST | `/api/v1/customers/{id}/cards` | Adicionar/substituir cartão salvo | JWT |
+| DELETE | `/api/v1/customers/{id}/cards/{cardId}` | Remover cartão salvo | JWT |
 
 > **Nota:** O `userId` é extraído automaticamente do token JWT (campo `sub` ou `id`). Não é necessário enviar no body ou query params.
+> **Cartão salvo (recorrência):** `POST /api/v1/payments` aceita `cardId` + `customerId` no lugar de `gatewayToken`, cobrando o cartão salvo sem novo `cardToken`.
 
 ### Exemplos de requisição
 
@@ -217,5 +221,6 @@ adapter/out/            ←
 | `JWT_SECRET` | Sim | Chave JWT em base64 (mesma da UserAPI) |
 | `MERCADOPAGO_ACCESS_TOKEN` | Não* | Access token do MP (sem ele = modo simulado) |
 | `MERCADOPAGO_PUBLIC_KEY` | Não | Public key para frontend MP.js |
+| `MERCADOPAGO_ENVIRONMENT` | Não | `sandbox` (padrão) ou `production` |
 
-\* Em produção, o token é obrigatório.
+\* Em produção, o token é obrigatório e deve ser `APP_USR-` com `MERCADOPAGO_ENVIRONMENT=production`.

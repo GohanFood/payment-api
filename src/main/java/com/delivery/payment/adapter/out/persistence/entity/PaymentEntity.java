@@ -44,6 +44,12 @@ public class PaymentEntity {
     @Column(name = "mp_payment_id")
     private Long mpPaymentId;
 
+    @Column(name = "customer_id")
+    private String customerId;
+
+    @Column(name = "card_id")
+    private String cardId;
+
     @Column(name = "qr_code", columnDefinition = "TEXT")
     private String qrCode;
 

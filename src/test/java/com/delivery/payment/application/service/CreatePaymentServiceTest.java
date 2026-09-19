@@ -18,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.util.UUID;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -45,11 +46,12 @@ class CreatePaymentServiceTest {
     @BeforeEach
     void setUp() {
         service = new CreatePaymentService(paymentRepository, paymentMessagingPort, pixGateway, cardGateway);
+        lenient().when(paymentRepository.saveAndFlush(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
     }
 
     private CreatePaymentRequest buildRequest(String method) {
         return CreatePaymentRequest.builder()
-                .orderId(UUID.randomUUID())
+                .referenceId("subscription:" + UUID.randomUUID())
                 .amount(new BigDecimal("150.00"))
                 .paymentMethod(method)
                 .payerEmail("test@email.com")
@@ -75,7 +77,7 @@ class CreatePaymentServiceTest {
     @Test
     void shouldRejectZeroAmount() {
         CreatePaymentRequest request = CreatePaymentRequest.builder()
-                .orderId(UUID.randomUUID())
+                .referenceId("subscription:" + UUID.randomUUID())
                 .amount(BigDecimal.ZERO)
                 .paymentMethod("PIX")
                 .build();
@@ -87,7 +89,7 @@ class CreatePaymentServiceTest {
     @Test
     void shouldRejectNegativeAmount() {
         CreatePaymentRequest request = CreatePaymentRequest.builder()
-                .orderId(UUID.randomUUID())
+                .referenceId("subscription:" + UUID.randomUUID())
                 .amount(new BigDecimal("-10.00"))
                 .paymentMethod("PIX")
                 .build();
@@ -99,7 +101,7 @@ class CreatePaymentServiceTest {
     @Test
     void shouldCreatePixPaymentAndCallMercadoPago() {
         CreatePaymentRequest request = CreatePaymentRequest.builder()
-                .orderId(UUID.randomUUID())
+                .referenceId("subscription:" + UUID.randomUUID())
                 .amount(new BigDecimal("200.00"))
                 .paymentMethod("PIX")
                 .payerEmail("pix@email.com")
@@ -130,7 +132,7 @@ class CreatePaymentServiceTest {
     @Test
     void shouldCreateCardPaymentAndCallMercadoPago() {
         CreatePaymentRequest request = CreatePaymentRequest.builder()
-                .orderId(UUID.randomUUID())
+                .referenceId("subscription:" + UUID.randomUUID())
                 .amount(new BigDecimal("89.90"))
                 .paymentMethod("CREDIT_CARD")
                 .payerEmail("card@email.com")
@@ -162,9 +164,39 @@ class CreatePaymentServiceTest {
     }
 
     @Test
+    void shouldCreateCardPaymentWithSavedCard() {
+        CreatePaymentRequest request = CreatePaymentRequest.builder()
+                .referenceId("subscription:" + UUID.randomUUID())
+                .amount(new BigDecimal("89.90"))
+                .paymentMethod("CREDIT_CARD")
+                .cardId("saved-card-id")
+                .customerId("customer-id")
+                .installments(1)
+                .description("Cobrança recorrente")
+                .build();
+
+        PaymentGatewayResponse gatewayResponse = PaymentGatewayResponse.builder()
+                .externalId("987654321")
+                .externalStatus("approved")
+                .externalStatusDetail("accredited")
+                .paymentTypeId("credit_card")
+                .build();
+
+        when(cardGateway.processCardPayment(any(PaymentGatewayRequest.class))).thenReturn(gatewayResponse);
+        when(paymentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Payment result = service.execute(request, USER_ID);
+
+        assertEquals(PaymentStatus.COMPLETED, result.getStatus());
+        assertEquals("customer-id", result.getCustomerId());
+        assertEquals("saved-card-id", result.getCardId());
+        verify(cardGateway).processCardPayment(any(PaymentGatewayRequest.class));
+    }
+
+    @Test
     void shouldCreateCardPaymentWithoutTokenAsPendingOnly() {
         CreatePaymentRequest request = CreatePaymentRequest.builder()
-                .orderId(UUID.randomUUID())
+                .referenceId("subscription:" + UUID.randomUUID())
                 .amount(new BigDecimal("50.00"))
                 .paymentMethod("CREDIT_CARD")
                 .build();
@@ -188,5 +220,25 @@ class CreatePaymentServiceTest {
 
         assertNotNull(result.getId());
         verify(paymentRepository).save(any());
+    }
+
+    @Test
+    void shouldReturnExistingPaymentForSameReferenceAndUser() {
+        CreatePaymentRequest request = buildRequest("CREDIT_CARD");
+        Payment existing = Payment.builder()
+                .id(UUID.randomUUID())
+                .userId(USER_ID)
+                .referenceId(request.getReferenceId())
+                .amount(request.getAmount())
+                .paymentMethod("CREDIT_CARD")
+                .status(PaymentStatus.COMPLETED)
+                .build();
+        when(paymentRepository.findByReferenceId(request.getReferenceId())).thenReturn(List.of(existing));
+
+        Payment result = service.execute(request, USER_ID);
+
+        assertSame(existing, result);
+        verify(paymentRepository, never()).save(any());
+        verifyNoInteractions(paymentMessagingPort, cardGateway, pixGateway);
     }
 }

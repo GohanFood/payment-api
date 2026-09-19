@@ -10,6 +10,15 @@ public interface PaymentRepository {
 
     Payment save(Payment payment);
 
+    /**
+     * Persists a payment before a gateway call. Production persistence flushes
+     * here so the unique business-reference constraint serializes concurrent
+     * attempts before any external charge is made.
+     */
+    default Payment saveAndFlush(Payment payment) {
+        return save(payment);
+    }
+
     Optional<Payment> findById(UUID id);
 
     List<Payment> findByUserId(String userId);
@@ -28,7 +37,7 @@ public interface PaymentRepository {
      */
     long countByUserId(String userId);
 
-    List<Payment> findByOrderId(UUID orderId);
+    List<Payment> findByReferenceId(String referenceId);
 
     Optional<Payment> findByMpPaymentId(Long mpPaymentId);
 

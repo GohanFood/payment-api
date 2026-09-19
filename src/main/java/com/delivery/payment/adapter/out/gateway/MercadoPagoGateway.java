@@ -2,17 +2,25 @@ package com.delivery.payment.adapter.out.gateway;
 
 import com.delivery.payment.application.dto.response.PixPaymentResponse;
 import com.delivery.payment.config.MercadoPagoProperties;
+import com.delivery.payment.domain.customer.AddCardCommand;
+import com.delivery.payment.domain.customer.CreateCustomerCommand;
+import com.delivery.payment.domain.customer.CustomerCardReference;
 import com.delivery.payment.domain.payment.exception.GatewayUnavailableException;
 import com.delivery.payment.domain.payment.gateway.PaymentGatewayRequest;
 import com.delivery.payment.domain.payment.gateway.PaymentGatewayResponse;
+import com.delivery.payment.port.CustomerGatewayPort;
 import com.mercadopago.MercadoPagoConfig;
 import com.mercadopago.client.common.IdentificationRequest;
+import com.mercadopago.client.customer.CustomerCardCreateRequest;
+import com.mercadopago.client.customer.CustomerClient;
+import com.mercadopago.client.customer.CustomerRequest;
 import com.mercadopago.client.payment.PaymentClient;
 import com.mercadopago.client.payment.PaymentCreateRequest;
 import com.mercadopago.client.payment.PaymentPayerRequest;
 import com.mercadopago.core.MPRequestOptions;
 import com.mercadopago.exceptions.MPApiException;
 import com.mercadopago.exceptions.MPException;
+import com.mercadopago.net.MPSearchRequest;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,8 +51,9 @@ import java.util.Map;
  * </ol>
  *
  * <h3>Credenciais:</h3>
- * <p>Tokens de produção ({@code APP_USR-}) são <b>rejeitados</b> na inicialização.
- * Use tokens sandbox com prefixo {@code TEST-} obtidos em:
+ * <p>Use tokens sandbox com prefixo {@code TEST-} (padrão) ou tokens de produção
+ * {@code APP_USR-} quando {@code MERCADOPAGO_ENVIRONMENT=production}. Obtenha as
+ * credenciais em:
  * <a href="https://www.mercadopago.com.br/settings/account/credentials">Mercado Pago Credentials</a></p>
  *
  * @see <a href="https://www.mercadopago.com.br/developers/pt/docs/checkout-api-payments/integration-configuration/card/integrate-via-cardform">Cartão via CardForm</a>
@@ -56,7 +65,8 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class MercadoPagoGateway
         implements com.delivery.payment.port.PaymentGatewayPort,
-                   com.delivery.payment.domain.payment.gateway.PaymentGatewayPort {
+                   com.delivery.payment.domain.payment.gateway.PaymentGatewayPort,
+                   CustomerGatewayPort {
 
     private static final String TOKEN_PREFIX_SANDBOX = "TEST-";
     private static final String TOKEN_PREFIX_PRODUCTION = "APP_USR-";
@@ -78,19 +88,21 @@ public class MercadoPagoGateway
             return;
         }
 
-        if (properties.isProductionToken()) {
+        if (properties.isProductionToken() && !properties.isProductionEnvironment()) {
             log.error("============================================================");
-            log.error("  TOKEN DE PRODUÇÃO DETECTADO — API configurada só para SANDBOX!");
+            log.error("  TOKEN DE PRODUÇÃO DETECTADO — ambiente configurado como '{}'.", properties.getEnvironment());
             log.error("  O token '{}' começa com '{}' (produção).",
                     maskToken(properties.getAccessToken()), TOKEN_PREFIX_PRODUCTION);
-            log.error("  Substitua por um token sandbox (prefixo {}).", TOKEN_PREFIX_SANDBOX);
+            log.error("  Use um token sandbox (prefixo {}) ou configure", TOKEN_PREFIX_SANDBOX);
+            log.error("  MERCADOPAGO_ENVIRONMENT=production.");
             log.error("============================================================");
             throw new IllegalStateException(
-                    "Token de produção detectado. Esta API só aceita sandbox (TEST-).");
+                    "Token de produção detectado com ambiente sandbox. Configure MERCADOPAGO_ENVIRONMENT=production.");
         }
 
-        if (!properties.isSandboxToken()) {
-            log.warn("Token Mercado Pago não parece ser de sandbox (esperado prefixo '{}').", TOKEN_PREFIX_SANDBOX);
+        if (!properties.isSandboxToken() && !properties.isProductionToken()) {
+            log.warn("Token Mercado Pago não parece ser de sandbox nem de produção (prefixos '{}' ou '{}').",
+                    TOKEN_PREFIX_SANDBOX, TOKEN_PREFIX_PRODUCTION);
         }
 
         MercadoPagoConfig.setAccessToken(properties.getAccessToken());
@@ -181,26 +193,20 @@ public class MercadoPagoGateway
     public PaymentGatewayResponse processCardPayment(PaymentGatewayRequest request) {
         assertReady();
 
-        if (request.getPaymentMethodId() == null || request.getPaymentMethodId().isBlank()) {
+        if (!request.usesSavedCard()
+                && (request.getPaymentMethodId() == null || request.getPaymentMethodId().isBlank())) {
             throw new IllegalArgumentException(
                     "paymentMethodId é obrigatório. Use a bandeira do cartão: visa, master, elo, amex, etc.");
         }
 
-        log.info("Processando pagamento via Mercado Pago Sandbox: amount={}, method={}, installments={}",
-                request.getTransactionAmount(), request.getPaymentMethodId(), request.getInstallments());
+        log.info("Processando pagamento via Mercado Pago: amount={}, method={}, installments={}, savedCard={}",
+                request.getTransactionAmount(), request.getPaymentMethodId(), request.getInstallments(),
+                request.usesSavedCard());
 
         try {
             PaymentClient client = new PaymentClient();
 
-            PaymentCreateRequest mpRequest = PaymentCreateRequest.builder()
-                    .transactionAmount(request.getTransactionAmount())
-                    .token(request.getCardToken())
-                    .description(request.getDescription())
-                    .installments(request.getInstallments())
-                    .paymentMethodId(request.getPaymentMethodId())
-                    .issuerId(request.getIssuerId())
-                    .payer(buildCardPayer(request))
-                    .build();
+            PaymentCreateRequest mpRequest = buildCardPaymentRequest(request);
 
             MPRequestOptions requestOptions = MPRequestOptions.builder()
                     .customHeaders(Map.of("x-idempotency-key", request.getIdempotencyKey()))
@@ -291,14 +297,153 @@ public class MercadoPagoGateway
     }
 
     // ──────────────────────────────────────────────
+    //  Customer + Card (CustomerGatewayPort)
+    // ──────────────────────────────────────────────
+
+    @Override
+    public CustomerCardReference createCustomerWithCard(CreateCustomerCommand command) {
+        assertReady();
+
+        log.info("Obtendo ou criando Customer e salvando cartão no Mercado Pago: email={}", command.getEmail());
+
+        try {
+            CustomerClient client = new CustomerClient();
+
+            CustomerRequest customerRequest = CustomerRequest.builder()
+                    .email(command.getEmail())
+                    .firstName(command.getFirstName())
+                    .lastName(command.getLastName())
+                    .identification(buildIdentification(command.getDocumentType(), command.getDocumentNumber()))
+                    .build();
+
+            com.mercadopago.resources.customer.Customer customer = findCustomerByEmail(client, command.getEmail());
+            if (customer == null) {
+                customer = client.create(customerRequest);
+                log.info("Customer criado no Mercado Pago: customerId={}", customer.getId());
+            } else {
+                log.info("Customer existente reutilizado no Mercado Pago: customerId={}", customer.getId());
+            }
+
+            com.mercadopago.resources.customer.CustomerCard card = client.createCard(
+                    customer.getId(),
+                    CustomerCardCreateRequest.builder()
+                            .token(command.getCardToken())
+                            .paymentMethodId(command.getPaymentMethodId())
+                            .build());
+
+            return toReference(customer.getId(), card, command.getPaymentMethodId());
+
+        } catch (Exception e) {
+            String mpErrorBody = extractMercadoPagoError(e);
+            log.error("Erro ao salvar cartão no Mercado Pago: {}", mpErrorBody, e);
+            throw new MercadoPagoIntegrationException(
+                    "Falha ao salvar cartão no Mercado Pago: " + mpErrorBody, e);
+        }
+    }
+
+    @Override
+    public CustomerCardReference addCard(String customerId, AddCardCommand command) {
+        assertReady();
+
+        log.info("Adicionando/trocando cartão no Mercado Pago: customerId={}", customerId);
+
+        try {
+            CustomerClient client = new CustomerClient();
+
+            com.mercadopago.resources.customer.CustomerCard card = client.createCard(
+                    customerId,
+                    CustomerCardCreateRequest.builder()
+                            .token(command.getCardToken())
+                            .paymentMethodId(command.getPaymentMethodId())
+                            .build());
+
+            return toReference(customerId, card, command.getPaymentMethodId());
+
+        } catch (Exception e) {
+            String mpErrorBody = extractMercadoPagoError(e);
+            log.error("Erro ao adicionar cartão no Mercado Pago: {}", mpErrorBody, e);
+            throw new MercadoPagoIntegrationException(
+                    "Falha ao adicionar cartão no Mercado Pago: " + mpErrorBody, e);
+        }
+    }
+
+    @Override
+    public void deleteCard(String customerId, String cardId) {
+        assertReady();
+
+        log.info("Removendo cartão no Mercado Pago: customerId={}, cardId={}", customerId, cardId);
+
+        try {
+            CustomerClient client = new CustomerClient();
+            client.deleteCard(customerId, cardId);
+        } catch (Exception e) {
+            String mpErrorBody = extractMercadoPagoError(e);
+            log.error("Erro ao remover cartão no Mercado Pago: {}", mpErrorBody, e);
+            throw new MercadoPagoIntegrationException(
+                    "Falha ao remover cartão no Mercado Pago: " + mpErrorBody, e);
+        }
+    }
+
+    // ──────────────────────────────────────────────
     //  Métodos auxiliares
     // ──────────────────────────────────────────────
+
+    /**
+     * O Mercado Pago não permite mais de um Customer para o mesmo e-mail.
+     * A busca torna o cadastro idempotente e permite anexar um novo cartão
+     * quando o comprador volta a assinar ou troca o meio de pagamento.
+     */
+    private com.mercadopago.resources.customer.Customer findCustomerByEmail(
+            CustomerClient client, String email) throws MPException, MPApiException {
+        var page = client.search(MPSearchRequest.builder()
+                .filters(Map.of("email", email))
+                .limit(1)
+                // sdk-java 2.8.0 inclui offset na query; não pode ser nulo.
+                .offset(0)
+                .build());
+
+        return page.getResults().isEmpty() ? null : page.getResults().get(0);
+    }
+
+    private PaymentCreateRequest buildCardPaymentRequest(PaymentGatewayRequest request) {
+        if (request.usesSavedCard()) {
+            return PaymentCreateRequest.builder()
+                    .transactionAmount(request.getTransactionAmount())
+                    .token(request.getCardId())
+                    .description(request.getDescription())
+                    .installments(request.getInstallments())
+                    .paymentMethodId(request.getPaymentMethodId())
+                    .payer(buildSavedCardPayer(request))
+                    .build();
+        }
+
+        return PaymentCreateRequest.builder()
+                .transactionAmount(request.getTransactionAmount())
+                .token(request.getCardToken())
+                .description(request.getDescription())
+                .installments(request.getInstallments())
+                .paymentMethodId(request.getPaymentMethodId())
+                .issuerId(request.getIssuerId())
+                .payer(buildCardPayer(request))
+                .build();
+    }
+
+    private PaymentPayerRequest buildSavedCardPayer(PaymentGatewayRequest request) {
+        PaymentPayerRequest.PaymentPayerRequestBuilder builder = PaymentPayerRequest.builder()
+                .type("customer")
+                .id(request.getCustomerId());
+
+        if (request.getPayerEmail() != null && !request.getPayerEmail().isBlank()) {
+            builder.email(request.getPayerEmail());
+        }
+
+        return builder.build();
+    }
 
     private PaymentPayerRequest buildCardPayer(PaymentGatewayRequest request) {
         PaymentPayerRequest.PaymentPayerRequestBuilder builder = PaymentPayerRequest.builder()
                 .email(request.getPayerEmail())
-                .entityType("individual")
-                .type("customer");
+                .entityType("individual");
 
         if (request.getIdentificationType() != null && request.getIdentificationNumber() != null) {
             builder.identification(
@@ -310,6 +455,31 @@ public class MercadoPagoGateway
         }
 
         return builder.build();
+    }
+
+    private IdentificationRequest buildIdentification(String documentType, String documentNumber) {
+        if (documentType == null || documentType.isBlank()
+                || documentNumber == null || documentNumber.isBlank()) {
+            return null;
+        }
+        return IdentificationRequest.builder()
+                .type(documentType)
+                .number(documentNumber)
+                .build();
+    }
+
+    private CustomerCardReference toReference(
+            String customerId,
+            com.mercadopago.resources.customer.CustomerCard card,
+            String fallbackPaymentMethodId) {
+        String paymentMethodId = card.getPaymentMethod() != null
+                ? card.getPaymentMethod().getId()
+                : fallbackPaymentMethodId;
+        return CustomerCardReference.builder()
+                .customerId(customerId)
+                .cardId(card.getId())
+                .paymentMethodId(paymentMethodId)
+                .build();
     }
 
     /**

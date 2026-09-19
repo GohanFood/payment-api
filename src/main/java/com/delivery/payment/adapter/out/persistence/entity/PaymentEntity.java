@@ -12,7 +12,9 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "payments")
+@Table(name = "payments", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_payments_user_reference", columnNames = {"user_id", "reference_id"})
+})
 @Data
 @Builder
 @NoArgsConstructor
@@ -25,8 +27,8 @@ public class PaymentEntity {
     @Column(name = "user_id", nullable = false)
     private String userId;
 
-    @Column(name = "order_id", nullable = false)
-    private UUID orderId;
+    @Column(name = "reference_id", nullable = false)
+    private String referenceId;
 
     @Column(nullable = false)
     private BigDecimal amount;
@@ -43,6 +45,12 @@ public class PaymentEntity {
 
     @Column(name = "mp_payment_id")
     private Long mpPaymentId;
+
+    @Column(name = "customer_id")
+    private String customerId;
+
+    @Column(name = "card_id")
+    private String cardId;
 
     @Column(name = "qr_code", columnDefinition = "TEXT")
     private String qrCode;

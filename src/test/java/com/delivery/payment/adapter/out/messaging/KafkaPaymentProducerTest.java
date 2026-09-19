@@ -29,9 +29,9 @@ class KafkaPaymentProducerTest {
     @Test
     void shouldPublishPaymentCreated() {
         UUID paymentId = UUID.randomUUID();
-        UUID orderId = UUID.randomUUID();
+        String referenceId = "subscription:" + UUID.randomUUID();
 
-        producer.publishPaymentCreated(paymentId, orderId);
+        producer.publishPaymentCreated(paymentId, referenceId);
 
         verify(kafkaTemplate).send(eq("payment.created"), eq(paymentId.toString()), anyString());
     }
@@ -39,9 +39,9 @@ class KafkaPaymentProducerTest {
     @Test
     void shouldPublishPaymentCompleted() {
         UUID paymentId = UUID.randomUUID();
-        UUID orderId = UUID.randomUUID();
+        String referenceId = "subscription:" + UUID.randomUUID();
 
-        producer.publishPaymentCompleted(paymentId, orderId);
+        producer.publishPaymentCompleted(paymentId, referenceId);
 
         verify(kafkaTemplate).send(eq("payment.completed"), eq(paymentId.toString()), anyString());
     }
@@ -49,9 +49,9 @@ class KafkaPaymentProducerTest {
     @Test
     void shouldPublishPaymentFailed() {
         UUID paymentId = UUID.randomUUID();
-        UUID orderId = UUID.randomUUID();
+        String referenceId = "subscription:" + UUID.randomUUID();
 
-        producer.publishPaymentFailed(paymentId, orderId);
+        producer.publishPaymentFailed(paymentId, referenceId);
 
         verify(kafkaTemplate).send(eq("payment.failed"), eq(paymentId.toString()), anyString());
     }
@@ -59,19 +59,19 @@ class KafkaPaymentProducerTest {
     @Test
     void shouldPublishPaymentRefunded() {
         UUID paymentId = UUID.randomUUID();
-        UUID orderId = UUID.randomUUID();
+        String referenceId = "subscription:" + UUID.randomUUID();
 
-        producer.publishPaymentRefunded(paymentId, orderId);
+        producer.publishPaymentRefunded(paymentId, referenceId);
 
         verify(kafkaTemplate).send(eq("payment.refunded"), eq(paymentId.toString()), anyString());
     }
 
     @Test
-    void shouldIncludePaymentAndOrderIdInMessage() {
+    void shouldIncludePaymentAndReferenceIdInMessage() {
         UUID paymentId = UUID.randomUUID();
-        UUID orderId = UUID.randomUUID();
+        String referenceId = "subscription:" + UUID.randomUUID();
 
-        producer.publishPaymentCreated(paymentId, orderId);
+        producer.publishPaymentCreated(paymentId, referenceId);
 
         verify(kafkaTemplate).send(
                 eq("payment.created"),

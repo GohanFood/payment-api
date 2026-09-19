@@ -8,7 +8,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
-import java.util.UUID;
 
 @Data
 @Builder
@@ -17,7 +16,7 @@ import java.util.UUID;
 public class CreatePaymentRequest {
 
     @NotNull
-    private UUID orderId;
+    private String referenceId;
 
     @NotNull
     @Positive
@@ -36,6 +35,12 @@ public class CreatePaymentRequest {
 
     /** CardToken gerado pelo MercadoPago.js CardForm */
     private String gatewayToken;
+
+    /** Cartão salvo (recorrência). Alternativa a {@code gatewayToken}. */
+    private String cardId;
+
+    /** ID do Customer no Mercado Pago (obrigatório quando usa {@code cardId}). */
+    private String customerId;
 
     /** Número de parcelas (default: 1) */
     @Builder.Default

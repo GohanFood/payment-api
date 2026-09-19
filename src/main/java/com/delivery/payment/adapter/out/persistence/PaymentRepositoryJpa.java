@@ -28,6 +28,13 @@ public class PaymentRepositoryJpa implements PaymentRepository {
     }
 
     @Override
+    public Payment saveAndFlush(Payment payment) {
+        var entity = mapper.toEntity(payment);
+        var saved = jpaRepository.saveAndFlush(entity);
+        return mapper.toDomain(saved);
+    }
+
+    @Override
     public Optional<Payment> findById(UUID id) {
         return jpaRepository.findById(id).map(mapper::toDomain);
     }
@@ -54,8 +61,8 @@ public class PaymentRepositoryJpa implements PaymentRepository {
     }
 
     @Override
-    public List<Payment> findByOrderId(UUID orderId) {
-        return jpaRepository.findByOrderId(orderId).stream()
+    public List<Payment> findByReferenceId(String referenceId) {
+        return jpaRepository.findByReferenceId(referenceId).stream()
                 .map(mapper::toDomain)
                 .toList();
     }

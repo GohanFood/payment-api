@@ -25,13 +25,13 @@ class PaymentEntityMapperTest {
     void shouldMapDomainToEntity() {
         UUID id = UUID.randomUUID();
         String userId = "user-1";
-        UUID orderId = UUID.randomUUID();
+        String referenceId = "subscription:" + UUID.randomUUID();
         LocalDateTime now = LocalDateTime.now();
 
         Payment domain = Payment.builder()
                 .id(id)
                 .userId("user-1")
-                .orderId(orderId)
+                .referenceId(referenceId)
                 .amount(new BigDecimal("150.00"))
                 .paymentMethod("CREDIT_CARD")
                 .status(PaymentStatus.PENDING)
@@ -45,7 +45,7 @@ class PaymentEntityMapperTest {
         assertNotNull(entity);
         assertEquals(id, entity.getId());
         assertEquals("user-1", entity.getUserId());
-        assertEquals(orderId, entity.getOrderId());
+        assertEquals(referenceId, entity.getReferenceId());
         assertEquals(new BigDecimal("150.00"), entity.getAmount());
         assertEquals("CREDIT_CARD", entity.getPaymentMethod());
         assertEquals(PaymentStatus.PENDING, entity.getStatus());
@@ -61,7 +61,7 @@ class PaymentEntityMapperTest {
         PaymentEntity entity = PaymentEntity.builder()
                 .id(id)
                 .userId("user-1")
-                .orderId(UUID.randomUUID())
+                .referenceId("subscription:" + UUID.randomUUID())
                 .amount(new BigDecimal("200.00"))
                 .paymentMethod("PIX")
                 .status(PaymentStatus.COMPLETED)
@@ -85,7 +85,7 @@ class PaymentEntityMapperTest {
         PaymentEntity entity = PaymentEntity.builder()
                 .id(UUID.randomUUID())
                 .userId("user-1")
-                .orderId(UUID.randomUUID())
+                .referenceId("subscription:" + UUID.randomUUID())
                 .amount(new BigDecimal("50.00"))
                 .paymentMethod("DEBIT_CARD")
                 .status(PaymentStatus.FAILED)
@@ -102,13 +102,13 @@ class PaymentEntityMapperTest {
     void shouldRoundTripCorrectly() {
         UUID id = UUID.randomUUID();
         String userId = "user-1";
-        UUID orderId = UUID.randomUUID();
+        String referenceId = "subscription:" + UUID.randomUUID();
         LocalDateTime now = LocalDateTime.now();
 
         Payment original = Payment.builder()
                 .id(id)
                 .userId("user-1")
-                .orderId(orderId)
+                .referenceId(referenceId)
                 .amount(new BigDecimal("99.99"))
                 .paymentMethod("CREDIT_CARD")
                 .status(PaymentStatus.REFUNDED)
@@ -122,7 +122,7 @@ class PaymentEntityMapperTest {
 
         assertEquals(original.getId(), roundTripped.getId());
         assertEquals(original.getUserId(), roundTripped.getUserId());
-        assertEquals(original.getOrderId(), roundTripped.getOrderId());
+        assertEquals(original.getReferenceId(), roundTripped.getReferenceId());
         assertEquals(original.getAmount(), roundTripped.getAmount());
         assertEquals(original.getPaymentMethod(), roundTripped.getPaymentMethod());
         assertEquals(original.getStatus(), roundTripped.getStatus());
@@ -135,7 +135,7 @@ class PaymentEntityMapperTest {
             PaymentEntity entity = PaymentEntity.builder()
                     .id(UUID.randomUUID())
                     .userId("user-1")
-                    .orderId(UUID.randomUUID())
+                    .referenceId("subscription:" + UUID.randomUUID())
                     .amount(new BigDecimal("100.00"))
                     .paymentMethod("CREDIT_CARD")
                     .status(status)

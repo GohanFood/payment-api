@@ -2,10 +2,12 @@ package com.delivery.payment.adapter.out.messaging;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
+@ConditionalOnProperty(prefix = "payment.kafka", name = "enabled", havingValue = "true")
 public class KafkaPaymentConsumer {
 
     @KafkaListener(topics = "order.created", groupId = "payment-group")

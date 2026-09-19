@@ -148,13 +148,10 @@ fi
 MAVEN_PROJECTBASEDIR="$BASE_DIR"
 export MAVEN_PROJECTBASEDIR
 
-# Load MAVEN_WRAPPER_REPO_URL and MAVEN_WRAPPER_VERSION from properties
-eval "`"$JAVACMD" -cp "$BASE_DIR/.mvn/wrapper/maven-wrapper.jar" MavenWrapperDownloader printConfig 2>/dev/null`"
-
-# Fallback to reading from properties files if JVM helper doesn't work
-if [ -z "$MAVEN_WRAPPER_REPO_URL" ]; then
-  MAVEN_WRAPPER_REPO_URL="https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.3.2/maven-wrapper-3.3.2.jar"
-fi
+# The wrapper JAR and its download URL are defined in
+# .mvn/wrapper/maven-wrapper.properties. The legacy MavenWrapperDownloader
+# class is not present in Maven Wrapper 3.3.2, so do not attempt to invoke it.
+MAVEN_WRAPPER_REPO_URL="https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.3.2/maven-wrapper-3.3.2.jar"
 
 # Attempt to set APP_HOME
 if [ -z "$MAVEN_HOME" ] || [ "$MAVEN_HOME" = "" ] ; then
@@ -192,14 +189,9 @@ if [ ! -f "$WRAPPER_LAUNCHER" ]; then
   fi
 fi
 
-# Escape application args
-save () {
-    for i in "$@"; do printf %s\\\\n "$i" | sed "s/'/'\\\\''/g;1s/^/'/;\$s/\$/' \\\\/" ; done
-    echo " "
-}
-APP_ARGS=`save "$@"`
-
-# Collect all arguments for the java command
-eval set -- "$DEFAULT_JVM_OPTS" "$JAVA_OPTS" "$MAVEN_OPTS" "-classpath" "$WRAPPER_LAUNCHER" "-Dmaven.multiModuleProjectDirectory=$MAVEN_PROJECTBASEDIR" org.apache.maven.wrapper.MavenWrapperMain "$APP_ARGS"
-
-exec "$JAVACMD" "$@"
+# Execute the wrapper directly. This avoids the legacy eval-based argument
+# construction, which is not portable to the POSIX shell used by CI runners.
+exec "$JAVACMD" \
+  -classpath "$WRAPPER_LAUNCHER" \
+  "-Dmaven.multiModuleProjectDirectory=$MAVEN_PROJECTBASEDIR" \
+  org.apache.maven.wrapper.MavenWrapperMain "$@"

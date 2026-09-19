@@ -8,6 +8,7 @@ import com.delivery.payment.application.usecase.*;
 import com.delivery.payment.config.JwtConfig;
 import com.delivery.payment.config.MercadoPagoWebhookValidator;
 import com.delivery.payment.config.SecurityConfig;
+import com.delivery.payment.adapter.out.callback.SubscriptionPaymentCallbackClient;
 import com.delivery.payment.domain.payment.Payment;
 import com.delivery.payment.domain.payment.PaymentStatus;
 import com.delivery.payment.domain.payment.exception.PaymentNotFoundException;
@@ -71,6 +72,9 @@ class PaymentControllerTest {
     @MockBean
     private MercadoPagoWebhookValidator webhookValidator;
 
+    @MockBean
+    private SubscriptionPaymentCallbackClient paymentCallbackClient;
+
     private String jwtToken;
     private static final String TEST_USER_ID = "user-123";
 
@@ -78,9 +82,13 @@ class PaymentControllerTest {
     void setUp() {
         when(jwtConfig.getSecret()).thenReturn("test-secret-key-for-testing-purposes-only");
 
+        jwtToken = tokenFor(TEST_USER_ID);
+    }
+
+    private String tokenFor(String userId) {
         SecretKey key = Keys.hmacShaKeyFor("test-secret-key-for-testing-purposes-only".getBytes(StandardCharsets.UTF_8));
-        jwtToken = Jwts.builder()
-                .subject(TEST_USER_ID)
+        return Jwts.builder()
+                .subject(userId)
                 .claim("role", "USER")
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + 3600000))
@@ -91,14 +99,14 @@ class PaymentControllerTest {
     @Test
     void shouldCreatePayment() throws Exception {
         CreatePaymentRequest request = new CreatePaymentRequest();
-        request.setOrderId(UUID.randomUUID());
+        request.setReferenceId("subscription:" + UUID.randomUUID());
         request.setAmount(new BigDecimal("150.00"));
         request.setPaymentMethod("CREDIT_CARD");
 
         Payment payment = Payment.builder()
                 .id(UUID.randomUUID())
                 .userId(TEST_USER_ID)
-                .orderId(request.getOrderId())
+                .referenceId(request.getReferenceId())
                 .amount(request.getAmount())
                 .paymentMethod(request.getPaymentMethod())
                 .status(PaymentStatus.PENDING)
@@ -120,7 +128,7 @@ class PaymentControllerTest {
     @Test
     void shouldRejectUnauthorizedRequest() throws Exception {
         CreatePaymentRequest request = new CreatePaymentRequest();
-        request.setOrderId(UUID.randomUUID());
+        request.setReferenceId("subscription:" + UUID.randomUUID());
         request.setAmount(new BigDecimal("100.00"));
         request.setPaymentMethod("PIX");
 
@@ -140,7 +148,7 @@ class PaymentControllerTest {
         Payment payment = Payment.builder()
                 .id(paymentId)
                 .userId(TEST_USER_ID)
-                .orderId(UUID.randomUUID())
+                .referenceId("subscription:" + UUID.randomUUID())
                 .amount(new BigDecimal("150.00"))
                 .paymentMethod("CREDIT_CARD")
                 .status(PaymentStatus.COMPLETED)
@@ -150,6 +158,7 @@ class PaymentControllerTest {
                 .build();
 
         when(processPaymentUseCase.execute(eq(paymentId), any(ProcessPaymentRequest.class))).thenReturn(payment);
+        when(getPaymentUseCase.execute(paymentId)).thenReturn(payment);
 
         mockMvc.perform(post("/api/v1/payments/" + paymentId + "/process")
                         .header("Authorization", "Bearer " + jwtToken)
@@ -166,7 +175,7 @@ class PaymentControllerTest {
         Payment payment = Payment.builder()
                 .id(paymentId)
                 .userId(TEST_USER_ID)
-                .orderId(UUID.randomUUID())
+                .referenceId("subscription:" + UUID.randomUUID())
                 .amount(new BigDecimal("200.00"))
                 .paymentMethod("PIX")
                 .status(PaymentStatus.PENDING)
@@ -194,11 +203,31 @@ class PaymentControllerTest {
     }
 
     @Test
+    void shouldRejectPaymentOwnedByAnotherUser() throws Exception {
+        UUID paymentId = UUID.randomUUID();
+        Payment payment = Payment.builder()
+                .id(paymentId)
+                .userId("another-user")
+                .referenceId("subscription:" + UUID.randomUUID())
+                .amount(new BigDecimal("10.00"))
+                .paymentMethod("PIX")
+                .status(PaymentStatus.PENDING)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
+        when(getPaymentUseCase.execute(paymentId)).thenReturn(payment);
+
+        mockMvc.perform(get("/api/v1/payments/" + paymentId)
+                        .header("Authorization", "Bearer " + jwtToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void shouldListPaymentsByUser() throws Exception {
         Payment p1 = Payment.builder()
                 .id(UUID.randomUUID())
                 .userId(TEST_USER_ID)
-                .orderId(UUID.randomUUID())
+                .referenceId("subscription:" + UUID.randomUUID())
                 .amount(new BigDecimal("100.00"))
                 .paymentMethod("CREDIT_CARD")
                 .status(PaymentStatus.COMPLETED)
@@ -224,7 +253,7 @@ class PaymentControllerTest {
         Payment payment = Payment.builder()
                 .id(paymentId)
                 .userId(TEST_USER_ID)
-                .orderId(UUID.randomUUID())
+                .referenceId("subscription:" + UUID.randomUUID())
                 .amount(new BigDecimal("100.00"))
                 .paymentMethod("CREDIT_CARD")
                 .status(PaymentStatus.REFUNDED)
@@ -233,6 +262,7 @@ class PaymentControllerTest {
                 .build();
 
         when(refundPaymentUseCase.execute(paymentId)).thenReturn(payment);
+        when(getPaymentUseCase.execute(paymentId)).thenReturn(payment);
 
         mockMvc.perform(post("/api/v1/payments/refund")
                         .header("Authorization", "Bearer " + jwtToken)

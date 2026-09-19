@@ -6,6 +6,7 @@ import com.delivery.payment.domain.payment.gateway.PaymentGatewayPort;
 import com.delivery.payment.domain.payment.gateway.PaymentGatewayResponse;
 import com.delivery.payment.port.PaymentMessagingPort;
 import com.delivery.payment.port.PaymentRepository;
+import com.delivery.payment.adapter.out.callback.SubscriptionPaymentCallbackClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -35,6 +36,7 @@ public class PaymentStatusSyncService {
     private final PaymentRepository paymentRepository;
     private final PaymentMessagingPort paymentMessagingPort;
     private final PaymentGatewayPort paymentGateway;
+    private final SubscriptionPaymentCallbackClient paymentCallbackClient;
 
     /**
      * Processa notificação de webhook do Mercado Pago.
@@ -73,13 +75,15 @@ public class PaymentStatusSyncService {
             // isFinalStatus no início do método já previne reprocessamento
             payment.markAsCompleted(mpPaymentId);
             Payment updated = paymentRepository.save(payment);
-            paymentMessagingPort.publishPaymentCompleted(updated.getId(), updated.getOrderId());
+            paymentMessagingPort.publishPaymentCompleted(updated.getId(), updated.getReferenceId());
+            paymentCallbackClient.send(updated);
             log.info("Pagamento aprovado via webhook: paymentId={}, mpPaymentId={}",
                     payment.getId(), mpPaymentId);
 
         } else if (mpStatus.isRejected()) {
             payment.markAsFailed();
-            paymentRepository.save(payment);
+            Payment updated = paymentRepository.save(payment);
+            paymentCallbackClient.send(updated);
             log.warn("Pagamento rejeitado via webhook: paymentId={}, detail={}",
                     payment.getId(), mpStatus.getExternalStatusDetail());
 

@@ -26,5 +26,9 @@ spring:
 jwt:
   secret: YnVzY2FuZG9Vc2VyQVBJU2VjcmV0QXNzZW1ibHlBcHBsaWNhdGlvbjIwMjY=
 
+payment:
+  kafka:
+    enabled: false
+
 server:
   port: 0

@@ -15,7 +15,7 @@ import com.delivery.payment.port.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -32,43 +32,93 @@ public class CreatePaymentService implements CreatePaymentUseCase {
     private final PaymentGatewayPort cardGateway;
 
     @Override
-    @Transactional
     public Payment execute(CreatePaymentRequest request, String userId) {
         if (request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
             throw new InvalidPaymentAmountException(request.getAmount());
         }
 
+        // The caller's reference identifies one business payment (for example, one
+        // subscription cycle). Returning it makes retries safe even after a timeout.
+        Payment existing = paymentRepository.findByReferenceId(request.getReferenceId()).stream()
+                .filter(payment -> userId.equals(payment.getUserId()))
+                .findFirst()
+                .orElse(null);
+        if (existing != null) {
+            log.info("Pagamento idempotente reutilizado: paymentId={}, referenceId={}",
+                    existing.getId(), request.getReferenceId());
+            return retryPendingPayment(existing, request);
+        }
+
         Payment newPayment = Payment.builder()
                 .id(UUID.randomUUID())
                 .userId(userId)
-                .orderId(request.getOrderId())
+                .referenceId(request.getReferenceId())
                 .amount(request.getAmount())
                 .paymentMethod(request.getPaymentMethod())
                 .status(PaymentStatus.PENDING)
                 .payerEmail(request.getPayerEmail())
                 .payerDocumentType(request.getPayerDocumentType())
                 .payerDocumentNumber(request.getPayerDocumentNumber())
+                .customerId(request.getCustomerId())
+                .cardId(request.getCardId())
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
 
-        // Integração com Mercado Pago para PIX
-        if (newPayment.isPix()) {
-            processPixPayment(newPayment, request);
-        }
-        // Integração com Mercado Pago para Cartão (CREDIT_CARD, DEBIT_CARD)
-        else if (isCardPayment(request) && request.getGatewayToken() != null) {
-            processCardPayment(newPayment, request);
+        // Reserve the business reference in the database *before* contacting the
+        // gateway. The unique (user_id, reference_id) constraint then prevents a
+        // concurrent request or another scheduler replica from double-charging.
+        Payment persisted;
+        try {
+            persisted = paymentRepository.saveAndFlush(newPayment);
+        } catch (DataIntegrityViolationException exception) {
+            Payment concurrentPayment = paymentRepository.findByReferenceId(request.getReferenceId()).stream()
+                    .filter(payment -> userId.equals(payment.getUserId()))
+                    .findFirst()
+                    .orElseThrow(() -> exception);
+            return retryPendingPayment(concurrentPayment, request);
         }
 
-        Payment saved = paymentRepository.save(newPayment);
-        paymentMessagingPort.publishPaymentCreated(saved.getId(), saved.getOrderId());
+        // Integração com Mercado Pago para PIX
+        if (persisted.isPix()) {
+            processPixPayment(persisted, request);
+        }
+        // Integração com Mercado Pago para Cartão (CREDIT_CARD, DEBIT_CARD)
+        // via cardToken (cartão novo) ou cardId (cartão salvo/recorrência)
+        else if (isCardPayment(request) && hasCardSource(request)) {
+            processCardPayment(persisted, request);
+        }
+
+        Payment saved = paymentRepository.save(persisted);
+        paymentMessagingPort.publishPaymentCreated(saved.getId(), saved.getReferenceId());
         return saved;
+    }
+
+    /**
+     * A request may time out after its payment row has been reserved. Reusing the
+     * same row (and therefore the same Mercado Pago idempotency key) lets PIX and
+     * saved-card requests safely resume instead of creating a second charge.
+     */
+    private Payment retryPendingPayment(Payment payment, CreatePaymentRequest request) {
+        if (!payment.isPending()) {
+            return payment;
+        }
+        if (payment.isPix()) {
+            processPixPayment(payment, request);
+        } else if (isCardPayment(request) && hasCardSource(request)) {
+            processCardPayment(payment, request);
+        }
+        return paymentRepository.save(payment);
     }
 
     private boolean isCardPayment(CreatePaymentRequest request) {
         String method = request.getPaymentMethod();
         return "CREDIT_CARD".equalsIgnoreCase(method) || "DEBIT_CARD".equalsIgnoreCase(method);
+    }
+
+    private boolean hasCardSource(CreatePaymentRequest request) {
+        return (request.getGatewayToken() != null && !request.getGatewayToken().isBlank())
+                || (request.getCardId() != null && !request.getCardId().isBlank());
     }
 
     private void processPixPayment(Payment payment, CreatePaymentRequest request) {
@@ -78,7 +128,7 @@ public class CreatePaymentService implements CreatePaymentUseCase {
             PixPaymentResponse mpResponse = pixGateway.createPixPayment(
                     idempotencyKey,
                     payment.getAmount(),
-                    "Pedido #" + payment.getOrderId(),
+                    "Assinatura " + payment.getReferenceId(),
                     payment.getPayerEmail(),
                     "",
                     "",
@@ -110,13 +160,15 @@ public class CreatePaymentService implements CreatePaymentUseCase {
         try {
             PaymentGatewayRequest gatewayRequest = PaymentGatewayRequest.builder()
                     .cardToken(request.getGatewayToken())
+                    .cardId(request.getCardId())
+                    .customerId(request.getCustomerId())
                     .transactionAmount(payment.getAmount())
                     .installments(request.getInstallments() != null ? request.getInstallments() : 1)
                     .paymentMethodId(request.getPaymentMethodId())
                     .issuerId(request.getIssuerId())
                     .description(request.getDescription() != null
                             ? request.getDescription()
-                            : "Pedido " + payment.getOrderId())
+                            : "Assinatura " + payment.getReferenceId())
                     .payerEmail(request.getPayerEmail())
                     .identificationType(request.getPayerDocumentType())
                     .identificationNumber(request.getPayerDocumentNumber())

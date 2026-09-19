@@ -16,7 +16,7 @@ public interface PaymentJpaRepository extends JpaRepository<PaymentEntity, UUID>
 
     long countByUserId(String userId);
 
-    List<PaymentEntity> findByOrderId(UUID orderId);
+    List<PaymentEntity> findByReferenceId(String referenceId);
 
     Optional<PaymentEntity> findByMpPaymentId(Long mpPaymentId);
 

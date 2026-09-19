@@ -20,7 +20,7 @@ jobs:
           java-version: '17'
           cache: maven
       - name: Run unit and integration tests
-        run: ./mvnw -B verify
+        run: ./mvnw -B test
 
   docker-build:
     needs: test

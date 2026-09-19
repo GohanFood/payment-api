@@ -34,6 +34,10 @@ spring:
 jwt:
   secret: ${JWT_SECRET}
 
+payment:
+  kafka:
+    enabled: ${PAYMENT_KAFKA_ENABLED:false}
+
 payment-callback:
   url: ${PAYMENT_CALLBACK_URL:}
   secret: ${SUBSCRIPTION_CALLBACK_SECRET:}

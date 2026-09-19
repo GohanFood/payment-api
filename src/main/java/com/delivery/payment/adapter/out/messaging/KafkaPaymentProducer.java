@@ -4,6 +4,7 @@ import com.delivery.payment.port.PaymentMessagingPort;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
@@ -11,6 +12,7 @@ import java.util.UUID;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty(prefix = "payment.kafka", name = "enabled", havingValue = "true")
 public class KafkaPaymentProducer implements PaymentMessagingPort {
 
     private final KafkaTemplate<String, String> kafkaTemplate;

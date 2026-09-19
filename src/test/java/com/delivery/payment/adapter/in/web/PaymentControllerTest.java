@@ -82,9 +82,13 @@ class PaymentControllerTest {
     void setUp() {
         when(jwtConfig.getSecret()).thenReturn("test-secret-key-for-testing-purposes-only");
 
+        jwtToken = tokenFor(TEST_USER_ID);
+    }
+
+    private String tokenFor(String userId) {
         SecretKey key = Keys.hmacShaKeyFor("test-secret-key-for-testing-purposes-only".getBytes(StandardCharsets.UTF_8));
-        jwtToken = Jwts.builder()
-                .subject(TEST_USER_ID)
+        return Jwts.builder()
+                .subject(userId)
                 .claim("role", "USER")
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + 3600000))
@@ -154,6 +158,7 @@ class PaymentControllerTest {
                 .build();
 
         when(processPaymentUseCase.execute(eq(paymentId), any(ProcessPaymentRequest.class))).thenReturn(payment);
+        when(getPaymentUseCase.execute(paymentId)).thenReturn(payment);
 
         mockMvc.perform(post("/api/v1/payments/" + paymentId + "/process")
                         .header("Authorization", "Bearer " + jwtToken)
@@ -198,6 +203,26 @@ class PaymentControllerTest {
     }
 
     @Test
+    void shouldRejectPaymentOwnedByAnotherUser() throws Exception {
+        UUID paymentId = UUID.randomUUID();
+        Payment payment = Payment.builder()
+                .id(paymentId)
+                .userId("another-user")
+                .referenceId("subscription:" + UUID.randomUUID())
+                .amount(new BigDecimal("10.00"))
+                .paymentMethod("PIX")
+                .status(PaymentStatus.PENDING)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
+        when(getPaymentUseCase.execute(paymentId)).thenReturn(payment);
+
+        mockMvc.perform(get("/api/v1/payments/" + paymentId)
+                        .header("Authorization", "Bearer " + jwtToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void shouldListPaymentsByUser() throws Exception {
         Payment p1 = Payment.builder()
                 .id(UUID.randomUUID())
@@ -237,6 +262,7 @@ class PaymentControllerTest {
                 .build();
 
         when(refundPaymentUseCase.execute(paymentId)).thenReturn(payment);
+        when(getPaymentUseCase.execute(paymentId)).thenReturn(payment);
 
         mockMvc.perform(post("/api/v1/payments/refund")
                         .header("Authorization", "Bearer " + jwtToken)

@@ -46,6 +46,7 @@ class CreatePaymentServiceTest {
     @BeforeEach
     void setUp() {
         service = new CreatePaymentService(paymentRepository, paymentMessagingPort, pixGateway, cardGateway);
+        lenient().when(paymentRepository.saveAndFlush(any(Payment.class))).thenAnswer(inv -> inv.getArgument(0));
     }
 
     private CreatePaymentRequest buildRequest(String method) {

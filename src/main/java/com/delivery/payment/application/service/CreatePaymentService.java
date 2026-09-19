@@ -15,7 +15,7 @@ import com.delivery.payment.port.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -32,7 +32,6 @@ public class CreatePaymentService implements CreatePaymentUseCase {
     private final PaymentGatewayPort cardGateway;
 
     @Override
-    @Transactional
     public Payment execute(CreatePaymentRequest request, String userId) {
         if (request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
             throw new InvalidPaymentAmountException(request.getAmount());
@@ -47,7 +46,7 @@ public class CreatePaymentService implements CreatePaymentUseCase {
         if (existing != null) {
             log.info("Pagamento idempotente reutilizado: paymentId={}, referenceId={}",
                     existing.getId(), request.getReferenceId());
-            return existing;
+            return retryPendingPayment(existing, request);
         }
 
         Payment newPayment = Payment.builder()
@@ -66,19 +65,50 @@ public class CreatePaymentService implements CreatePaymentUseCase {
                 .updatedAt(LocalDateTime.now())
                 .build();
 
+        // Reserve the business reference in the database *before* contacting the
+        // gateway. The unique (user_id, reference_id) constraint then prevents a
+        // concurrent request or another scheduler replica from double-charging.
+        Payment persisted;
+        try {
+            persisted = paymentRepository.saveAndFlush(newPayment);
+        } catch (DataIntegrityViolationException exception) {
+            Payment concurrentPayment = paymentRepository.findByReferenceId(request.getReferenceId()).stream()
+                    .filter(payment -> userId.equals(payment.getUserId()))
+                    .findFirst()
+                    .orElseThrow(() -> exception);
+            return retryPendingPayment(concurrentPayment, request);
+        }
+
         // Integração com Mercado Pago para PIX
-        if (newPayment.isPix()) {
-            processPixPayment(newPayment, request);
+        if (persisted.isPix()) {
+            processPixPayment(persisted, request);
         }
         // Integração com Mercado Pago para Cartão (CREDIT_CARD, DEBIT_CARD)
         // via cardToken (cartão novo) ou cardId (cartão salvo/recorrência)
         else if (isCardPayment(request) && hasCardSource(request)) {
-            processCardPayment(newPayment, request);
+            processCardPayment(persisted, request);
         }
 
-        Payment saved = paymentRepository.save(newPayment);
+        Payment saved = paymentRepository.save(persisted);
         paymentMessagingPort.publishPaymentCreated(saved.getId(), saved.getReferenceId());
         return saved;
+    }
+
+    /**
+     * A request may time out after its payment row has been reserved. Reusing the
+     * same row (and therefore the same Mercado Pago idempotency key) lets PIX and
+     * saved-card requests safely resume instead of creating a second charge.
+     */
+    private Payment retryPendingPayment(Payment payment, CreatePaymentRequest request) {
+        if (!payment.isPending()) {
+            return payment;
+        }
+        if (payment.isPix()) {
+            processPixPayment(payment, request);
+        } else if (isCardPayment(request) && hasCardSource(request)) {
+            processCardPayment(payment, request);
+        }
+        return paymentRepository.save(payment);
     }
 
     private boolean isCardPayment(CreatePaymentRequest request) {

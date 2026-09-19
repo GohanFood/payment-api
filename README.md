@@ -61,7 +61,7 @@ cp .env.example .env
 #   MERCADOPAGO_ACCESS_TOKEN=TEST-...  (opcional — sem token usa modo simulado)
 #   MERCADOPAGO_PUBLIC_KEY=TEST-...
 
-# 2. Suba a API + banco + Kafka
+# 2. Suba a API + banco (Kafka é opcional)
 docker compose up -d
 ```
 
@@ -173,7 +173,7 @@ Use estes cartões no ambiente de testes do Mercado Pago:
 ```json
 POST /api/v1/payments
 {
-  "orderId": "660e8400-e29b-41d4-a716-446655440002",
+  "referenceId": "subscription:660e8400-e29b-41d4-a716-446655440002",
   "amount": 150.00,
   "paymentMethod": "PIX",
   "payerEmail": "test_user_123@testuser.com",
@@ -186,7 +186,7 @@ POST /api/v1/payments
 ```json
 POST /api/v1/payments
 {
-  "orderId": "660e8400-e29b-41d4-a716-446655440100",
+  "referenceId": "subscription:660e8400-e29b-41d4-a716-446655440100",
   "amount": 89.90,
   "paymentMethod": "CREDIT_CARD",
   "payerEmail": "test_user_123@testuser.com",
@@ -222,5 +222,8 @@ adapter/out/            ←
 | `MERCADOPAGO_ACCESS_TOKEN` | Não* | Access token do MP (sem ele = modo simulado) |
 | `MERCADOPAGO_PUBLIC_KEY` | Não | Public key para frontend MP.js |
 | `MERCADOPAGO_ENVIRONMENT` | Não | `sandbox` (padrão) ou `production` |
+| `PAYMENT_KAFKA_ENABLED` | Não | `true` para habilitar eventos Kafka; padrão `false` |
+| `PAYMENT_CALLBACK_URL` | Não | URL do callback assinado para assinaturas (`/subscriptions/payment-webhook`) |
+| `SUBSCRIPTION_CALLBACK_SECRET` | Com callback | Segredo enviado no header `X-Webhook-Secret` |
 
 \* Em produção, o token é obrigatório e deve ser `APP_USR-` com `MERCADOPAGO_ENVIRONMENT=production`.

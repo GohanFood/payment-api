@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import com.delivery.payment.domain.payment.PaymentStatus;
+import com.delivery.payment.domain.payment.exception.PaymentAccessDeniedException;
 
 @Slf4j
 @RestController
@@ -54,6 +55,7 @@ public class PaymentController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<PaymentResponse> process(@PathVariable UUID id,
                                                     @Valid @RequestBody ProcessPaymentRequest request) {
+        ensurePaymentOwner(id);
         Payment processed = processPaymentUseCase.execute(id, request);
         sendCallbackIfFinal(processed);
         return ResponseEntity.ok(toResponse(processed));
@@ -62,7 +64,7 @@ public class PaymentController {
     @GetMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<PaymentResponse> getById(@PathVariable UUID id) {
-        Payment payment = getPaymentUseCase.execute(id);
+        Payment payment = ensurePaymentOwner(id);
         return ResponseEntity.ok(toResponse(payment));
     }
 
@@ -79,6 +81,7 @@ public class PaymentController {
     @PostMapping("/refund")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<PaymentResponse> refund(@Valid @RequestBody RefundPaymentRequest request) {
+        ensurePaymentOwner(request.getPaymentId());
         Payment refunded = refundPaymentUseCase.execute(request.getPaymentId());
         sendCallbackIfFinal(refunded);
         return ResponseEntity.ok(toResponse(refunded));
@@ -183,5 +186,13 @@ public class PaymentController {
                 || payment.getStatus() == PaymentStatus.CANCELLED) {
             paymentCallbackClient.send(payment);
         }
+    }
+
+    private Payment ensurePaymentOwner(UUID paymentId) {
+        Payment payment = getPaymentUseCase.execute(paymentId);
+        if (!getCurrentUserId().equals(payment.getUserId())) {
+            throw new PaymentAccessDeniedException(paymentId);
+        }
+        return payment;
     }
 }

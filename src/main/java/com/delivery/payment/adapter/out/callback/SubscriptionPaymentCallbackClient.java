@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 
 @Slf4j
 @Component
@@ -43,11 +44,12 @@ public class SubscriptionPaymentCallbackClient {
             String paymentId,
             String status,
             String paymentMethod,
+            BigDecimal amount,
             Long mpPaymentId,
             LocalDateTime occurredAt) {
         PaymentCallbackPayload(Payment payment) {
             this(payment.getReferenceId(), payment.getId().toString(), payment.getStatus().name(),
-                    payment.getPaymentMethod(), payment.getMpPaymentId(), LocalDateTime.now());
+                    payment.getPaymentMethod(), payment.getAmount(), payment.getMpPaymentId(), LocalDateTime.now());
         }
     }
 }

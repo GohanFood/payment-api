@@ -4,6 +4,7 @@ import com.delivery.payment.adapter.out.gateway.MercadoPagoIntegrationException;
 import com.delivery.payment.domain.payment.exception.GatewayUnavailableException;
 import com.delivery.payment.domain.payment.exception.InvalidPaymentAmountException;
 import com.delivery.payment.domain.payment.exception.PaymentAlreadyProcessedException;
+import com.delivery.payment.domain.payment.exception.PaymentAccessDeniedException;
 import com.delivery.payment.domain.payment.exception.PaymentNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -26,6 +27,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(PaymentAlreadyProcessedException.class)
     public ResponseEntity<ErrorResponse> handlePaymentAlreadyProcessed(PaymentAlreadyProcessedException ex) {
         return buildResponse(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
+    @ExceptionHandler(PaymentAccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handlePaymentAccessDenied(PaymentAccessDeniedException ex) {
+        return buildResponse(HttpStatus.FORBIDDEN, "Acesso negado ao pagamento");
     }
 
     @ExceptionHandler(InvalidPaymentAmountException.class)

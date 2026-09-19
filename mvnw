@@ -149,7 +149,7 @@ MAVEN_PROJECTBASEDIR="$BASE_DIR"
 export MAVEN_PROJECTBASEDIR
 
 # Load MAVEN_WRAPPER_REPO_URL and MAVEN_WRAPPER_VERSION from properties
-eval "`"$JAVACMD" -cp "$BASE_DIR/.mvn/wrapper/maven-wrapper.jar" MavenWrapperDownloader printConfig 2>/dev/null`"
+eval "$("$JAVACMD" -cp "$BASE_DIR/.mvn/wrapper/maven-wrapper.jar" MavenWrapperDownloader printConfig 2>/dev/null)"
 
 # Fallback to reading from properties files if JVM helper doesn't work
 if [ -z "$MAVEN_WRAPPER_REPO_URL" ]; then

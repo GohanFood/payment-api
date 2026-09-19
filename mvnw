@@ -189,14 +189,9 @@ if [ ! -f "$WRAPPER_LAUNCHER" ]; then
   fi
 fi
 
-# Escape application args
-save () {
-    for i in "$@"; do printf %s\\\\n "$i" | sed "s/'/'\\\\''/g;1s/^/'/;\$s/\$/' \\\\/" ; done
-    echo " "
-}
-APP_ARGS=`save "$@"`
-
-# Collect all arguments for the java command
-eval set -- "$DEFAULT_JVM_OPTS" "$JAVA_OPTS" "$MAVEN_OPTS" "-classpath" "$WRAPPER_LAUNCHER" "-Dmaven.multiModuleProjectDirectory=$MAVEN_PROJECTBASEDIR" org.apache.maven.wrapper.MavenWrapperMain "$APP_ARGS"
-
-exec "$JAVACMD" "$@"
+# Execute the wrapper directly. This avoids the legacy eval-based argument
+# construction, which is not portable to the POSIX shell used by CI runners.
+exec "$JAVACMD" \
+  -classpath "$WRAPPER_LAUNCHER" \
+  "-Dmaven.multiModuleProjectDirectory=$MAVEN_PROJECTBASEDIR" \
+  org.apache.maven.wrapper.MavenWrapperMain "$@"
